@@ -1,0 +1,72 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Recordings and Media Output (keep directory structure via .gitkeep)
+recordings/*
+!recordings/.gitkeep
+recordings/snapshots/*
+!recordings/snapshots/.gitkeep
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.wav
+*.m4a
+*.aac
+*.opus
+
+# Temporary / Scratch Dumps
+-
+*.tmp
+*.bak
+*.swp
+*.swo
+omnicapture_test.txt
+config.backup.json
+
+# Google Drive OAuth & Security Secrets
+client_secrets.json
+drive_token.json
+credentials.json
+*.token
+*.key
+.env
+.env.*
+
+# Local Log Files
+*.log
+logs/
+
+# IDE and Editor Configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Operating System Files
+Thumbs.db
+desktop.ini
+.DS_Store

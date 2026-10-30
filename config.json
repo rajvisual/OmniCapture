@@ -1,0 +1,22 @@
+{
+  "scrcpy_dir": "bin",
+  "recordings_dir": "recordings",
+  "default_record_format": "mp4",
+  "default_camera_facing": "back",
+  "default_camera_fps": 30,
+  "default_camera_size": "",
+  "max_size": 1200,
+  "video_bit_rate": "8M",
+  "max_fps": 60,
+  "screen_off_during_capture": true,
+  "stay_awake": false,
+  "audio_source": "mic",
+  "google_drive": {
+    "enabled": false,
+    "method": "desktop",
+    "folder_id": "",
+    "credentials_file": "client_secrets.json",
+    "token_file": "drive_token.json",
+    "desktop_sync_path": ""
+  }
+}
