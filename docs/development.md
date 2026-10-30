@@ -54,7 +54,7 @@ graph TD
 
 1. **Clone the repository**:
    ```powershell
-   git clone https://github.com/your-username/OmniCapture.git
+   git clone https://github.com/rajvisual/OmniCapture.git
    cd OmniCapture
    ```
 

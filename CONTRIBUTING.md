@@ -32,7 +32,7 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 1. **Fork the repository** on GitHub.
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/<your-username>/OmniCapture.git
+   git clone https://github.com/rajvisual/OmniCapture.git
    cd OmniCapture
    ```
 3. **Create a topic branch**:

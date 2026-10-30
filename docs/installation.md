@@ -45,7 +45,7 @@ Xiaomi MIUI and HyperOS enforce an extra security restriction that blocks touch 
 Open PowerShell or Command Prompt:
 
 ```powershell
-git clone https://github.com/<your-username>/OmniCapture.git
+git clone https://github.com/rajvisual/OmniCapture.git
 cd OmniCapture
 ```
 

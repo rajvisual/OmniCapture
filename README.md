@@ -123,7 +123,7 @@ Open PowerShell and run:
 
 ```powershell
 # Clone the repository
-git clone https://github.com/your-username/OmniCapture.git
+git clone https://github.com/rajvisual/OmniCapture.git
 cd OmniCapture
 
 # (Optional) Create virtual environment for cloud features
