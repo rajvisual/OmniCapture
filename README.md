@@ -67,15 +67,21 @@ Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge 
 - **Standard Video Containers**: Save files as standard `.mp4` or robust `.mkv` files with custom frame rates (30/60 FPS).
 - **Headless Recording**: Support for `--no-playback` background capture without opening an active preview window on your desktop.
 
-### 4. Linux Kernel UHID Input Mode (Xiaomi / POCO Fix)
+### 4. Dual Simultaneous Recording (PC Screen + Mobile Camera -> 2 Separate Files)
+- **Concurrent Dual Capture**: Records your full Windows desktop display and mobile camera feed at the exact same time into **two separate, dedicated video files** (`REC_PC_SCREEN_*.mp4` and `REC_MOBILE_CAMERA_*.mp4`).
+- **Creator & Gaming Ready**: Ideal for video tutorials, streaming, and content creation where having isolated tracks allows flexible editing, repositioning, and reframing without fixed PiP overlay destruction.
+- **Synchronized Session Control**: Press `Enter` or `Ctrl+C` in the terminal to cleanly finalize and stop both streams simultaneously.
+- **Stealth Mobile Display**: Phone display remains turned off during recording to conserve battery and eliminate heat.
+
+### 5. Linux Kernel UHID Input Mode (Xiaomi / POCO Fix)
 - **Bypass OEM Security Locks**: Xiaomi MIUI and HyperOS devices block standard ADB touch injection (`java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission`).
 - **Hardware Simulation**: The `--uhid` flag registers a virtual USB HID mouse and keyboard directly at the Linux kernel level (`/dev/uhid`), providing immediate, stutter-free mouse control without enabling obscure developer account settings.
 
-### 5. Hybrid Google Drive Cloud Synchronization
+### 6. Hybrid Google Drive Cloud Synchronization
 - **Option A (Zero Overhead)**: Automatically copies completed recordings to your local Google Drive for Desktop virtual drive (`G:\My Drive\OmniCapture`).
 - **Option B (REST API v3)**: Standalone OAuth 2.0 chunked resumable upload engine that uploads large video files in the background without needing Google Drive desktop software installed.
 
-### 6. One-Click Wireless Mode (Wi-Fi ADB)
+### 7. One-Click Wireless Mode (Wi-Fi ADB)
 - Automatically queries your device's active local IP address via `ip route`, initializes port `5555` TCP/IP listening, and switches to wireless streaming so you can unplug your USB cable.
 
 ---
@@ -163,10 +169,16 @@ python omni.py record screen --format mp4
 # 7. Record Camera Directly to PC with Auto Cloud Upload
 python omni.py record camera --facing back --upload
 
-# 8. Run Hardware Diagnostics & Sensor Inspection
+# 8. Dual Simultaneous Record: PC Screen + Mobile Camera (2 Separate Files)
+python omni.py dual-record --facing back --pc-fps 30 --camera-fps 30
+
+# 9. Dual Record with Auto Google Drive Upload
+python omni.py dual-record --upload
+
+# 10. Run Hardware Diagnostics & Sensor Inspection
 python omni.py info
 
-# 9. Switch to Wireless Wi-Fi ADB Mode
+# 11. Switch to Wireless Wi-Fi ADB Mode
 python omni.py wireless
 ```
 
@@ -236,8 +248,9 @@ OmniCapture/
 │
 ├── core/                       # Core application logic
 │   ├── adb_manager.py          # ADB interface, diagnostics & battery monitor
+│   ├── pc_recorder.py          # Windows PC screen recorder via FFmpeg gdigrab
 │   ├── scrcpy_engine.py        # Process orchestration & flag validation
-│   ├── recorder.py             # Direct-to-PC recording & metric tracking
+│   ├── recorder.py             # Direct-to-PC & dual simultaneous recording
 │   └── drive_uploader.py       # Google Drive Desktop & API v3 uploader
 │
 ├── bin/                        # Portable runtime binaries (scrcpy & adb)
@@ -265,6 +278,7 @@ OmniCapture/
 ├── tests/                      # Automated unit test suite
 │   ├── test_cli.py             # CLI parser verification
 │   ├── test_config.py          # Configuration loading & path validation
+│   ├── test_pc_recorder.py     # PC screen capture & dual filenames verification
 │   └── test_scrcpy_args.py     # Command flag builder & constraint tests
 │
 └── recordings/                 # Default destination for saved MP4/MKV captures
@@ -281,9 +295,10 @@ OmniCapture/
 - [x] **v1.0.0**: Stealth Camera2 API streaming with phone screen sleeping.
 - [x] **v1.0.0**: Linux kernel UHID mouse/keyboard hardware simulation.
 - [x] **v1.0.0**: Hybrid Google Drive cloud sync (Desktop virtual path + REST API v3).
-- [ ] **v1.1.0** *(Planned)*: System-tray background daemon with global Windows hotkeys.
-- [ ] **v1.2.0** *(Planned)*: Virtual webcam driver integration (OBS / Discord / Zoom direct input).
-- [ ] **v1.3.0** *(Planned)*: Multi-device grid view (control 4+ phones simultaneously).
+- [x] **v1.1.0**: Dual simultaneous recording (PC Screen + Mobile Camera saved as 2 separate files).
+- [ ] **v1.2.0** *(Planned)*: System-tray background daemon with global Windows hotkeys.
+- [ ] **v1.3.0** *(Planned)*: Virtual webcam driver integration (OBS / Discord / Zoom direct input).
+- [ ] **v1.4.0** *(Planned)*: Multi-device grid view (control 4+ phones simultaneously).
 
 ---
 

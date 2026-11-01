@@ -5,6 +5,20 @@ All notable changes to the **OmniCapture** project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-01
+
+### Added
+- **Dual Simultaneous Recording (PC Screen + Mobile Camera)**:
+  - Added concurrent recording of the Windows PC desktop and Android camera sensor into **two separate, independent video files** (`REC_PC_SCREEN_*.mp4` and `REC_MOBILE_CAMERA_*.mp4`).
+  - Added `core/pc_recorder.py`: Windows desktop capture engine leveraging FFmpeg's `gdigrab` with mouse cursor tracking and low-CPU `libx264` encoding.
+  - Added `record_dual_pc_and_mobile_camera()` coordinator in `core/recorder.py` for single-keypress synchronized stop (`Enter` / `Ctrl+C`).
+  - Added CLI command `python omni.py dual-record` with `--facing`, `--pc-fps`, `--camera-fps`, `--format`, `--no-camera-playback`, and `--upload` arguments.
+  - Added option `[7]` to interactive terminal dashboard menu for one-click setup.
+  - Automated dual upload: automatically queues both separate recording files to Google Drive when cloud sync is enabled.
+- **Unit Tests**:
+  - Added `tests/test_pc_recorder.py` validating FFmpeg command flag construction and dual filename generation.
+  - Extended `tests/test_cli.py` to cover `dual-record` and `record dual`.
+
 ## [1.0.0] - 2026-10-30
 
 ### Initial Release

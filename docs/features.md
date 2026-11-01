@@ -103,7 +103,39 @@ Launches two synchronized, independent windows: one streaming the interactive ph
 
 ---
 
-## ☁️ 6. Automated Cloud Synchronization
+## 🔴 6. Dual Simultaneous Recording (PC Screen + Mobile Camera)
+
+### Overview
+Simultaneously records both your **Windows PC Screen** and your **Android Mobile Camera** concurrently, saving both streams into **two separate, independent video files** in real-time.
+
+```text
+OmniCapture Dual Recording Session
+├── recordings/REC_PC_SCREEN_20261101_090000.mp4      (Full PC Desktop via FFmpeg)
+└── recordings/REC_MOBILE_CAMERA_20261101_090000.mp4  (Stealth Android Camera via scrcpy)
+```
+
+### Key Advantages
+- **Two Separate Raw Tracks**: Content creators, educators, and gamers can edit, reframe, crop, color-grade, and position their PC gameplay/work and webcam feed independently in editing software (Premiere Pro, DaVinci Resolve, CapCut).
+- **Zero Loss from Picture-in-Picture Embedding**: Unlike standard screen recorders that bake the webcam into a fixed corner box, dual separate files retain 100% of the screen under the camera.
+- **Synchronous Session Timing**: Both streams start and stop simultaneously via a single coordinated command (`Ctrl + C` or `Enter`), ensuring perfect audio/video timeline alignment.
+- **Stealth Mobile Operation**: While recording, the phone screen powers off automatically (`KEYCODE_SLEEP`), preserving battery and preventing overheating.
+- **Dual Cloud Auto-Upload**: If Google Drive synchronization is enabled, both files are queued and uploaded to Google Drive upon session completion.
+
+### Usage
+```powershell
+# Interactive CLI launcher
+python omni.py dual-record
+
+# Custom frame rates and front selfie camera
+python omni.py dual-record --facing front --pc-fps 60 --camera-fps 30
+
+# Background silent camera capture with automatic Google Drive upload
+python omni.py dual-record --no-camera-playback --upload
+```
+
+---
+
+## ☁️ 7. Automated Cloud Synchronization
 
 ### Option A: Google Drive for Desktop Sync
 - Inspects mounted drive letters (`G:`, `H:`, etc.) for `My Drive`.
@@ -117,7 +149,7 @@ Launches two synchronized, independent windows: one streaming the interactive ph
 
 ---
 
-## 📶 7. Wireless Wi-Fi ADB Mode
+## 📶 8. Wireless Wi-Fi ADB Mode
 
 - Detects the local IP address assigned to your phone's Wi-Fi network interface (`wlan0`).
 - Automatically restarts ADB in TCP mode (`adb tcpip 5555`) and establishes a TCP connection (`adb connect <ip>:5555`).

@@ -156,19 +156,20 @@ def interactive_menu(
 
         print("""
 \033[1;37mMAIN MENU OPTIONS:\033[0m
-  \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & Controller\033[0m     (Interactive PC control, keyboard & mouse)
-  \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m      (\033[92mNO camera app opened\033[0m, raw sensor feed)
-  \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m     (\033[92mNO camera app opened\033[0m, selfie camera)
-  \033[1;36m[4]\033[0m 🔴  \033[1mRecord Screen -> PC (Unlimited)\033[0m (Direct stream with Pause/Resume hotkeys)
-  \033[1;36m[5]\033[0m 🎥  \033[1mRecord Camera -> PC (Unlimited)\033[0m (Stealth camera + mic audio -> PC)
-  \033[1;36m[6]\033[0m 🔄  \033[1mDual Mode (Screen + Camera PiP)\033[0m (Display + Camera side-by-side)
-  \033[1;33m[7]\033[0m ⌨️   \033[1mView Keyboard Hotkeys Guide\033[0m     (Pause, Resume, Screen Off, Stop shortcuts)
-  \033[1;36m[8]\033[0m 📶  \033[1mSwitch to Wireless ADB (Wi-Fi)\033[0m  (Unplug USB and capture wirelessly!)
-  \033[1;36m[9]\033[0m ☁️   \033[1mGoogle Drive Cloud Settings\033[0m     (Option A Desktop Sync / Drive API)
-  \033[1;36m[10]\033[0m 🔍 \033[1mDiagnostics & Camera Details\033[0m    (List all camera IDs, resolutions, battery)
+  \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & Controller\033[0m          (Interactive PC control, keyboard & mouse)
+  \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m           (\033[92mNO camera app opened\033[0m, raw sensor feed)
+  \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m          (\033[92mNO camera app opened\033[0m, selfie camera)
+  \033[1;36m[4]\033[0m 🔴  \033[1mRecord Mobile Screen -> PC\033[0m           (Direct stream with Pause/Resume hotkeys)
+  \033[1;36m[5]\033[0m 🎥  \033[1mRecord Mobile Camera -> PC\033[0m           (Stealth camera + mic audio -> PC)
+  \033[1;36m[6]\033[0m 🔄  \033[1mDual Mode Preview (Screen + Cam)\033[0m     (Display + Camera preview side-by-side)
+  \033[1;32m[7]\033[0m 🔴  \033[1mDual Record (PC Screen + Mobile Cam)\033[0m (\033[93mRecord both at once -> 2 Separate Files\033[0m)
+  \033[1;33m[8]\033[0m ⌨️   \033[1mView Keyboard Hotkeys Guide\033[0m          (Pause, Resume, Screen Off, Stop shortcuts)
+  \033[1;36m[9]\033[0m 📶  \033[1mSwitch to Wireless ADB (Wi-Fi)\033[0m       (Unplug USB and capture wirelessly!)
+  \033[1;36m[10]\033[0m ☁️  \033[1mGoogle Drive Cloud Settings\033[0m          (Option A Desktop Sync / Drive API)
+  \033[1;36m[11]\033[0m 🔍 \033[1mDiagnostics & Camera Details\033[0m         (List all camera IDs, resolutions, battery)
   \033[1;31m[0]\033[0m 🚪  \033[1mExit\033[0m
 """)
-        choice = input("\033[1;33mSelect an option [0-10]: \033[0m").strip()
+        choice = input("\033[1;33mSelect an option [0-11]: \033[0m").strip()
 
         if choice == "1":
             print("\n\033[96m[+] Launching Display Mirror & Controller...\033[0m")
@@ -250,7 +251,7 @@ def interactive_menu(
             input("\nPress Enter to return to menu...")
 
         elif choice == "6":
-            print("\n\033[96m[+] Launching Dual Mode (Screen + Camera Side-by-Side)...\033[0m")
+            print("\n\033[96m[+] Launching Dual Mode Preview (Screen + Camera Side-by-Side)...\033[0m")
             import subprocess
             cmd_screen = scrcpy.build_command("mirror", {"device_id": dev_id, "window_title": "OmniCapture - Phone Screen"})
             cmd_cam = scrcpy.build_command("camera", {"device_id": dev_id, "camera_facing": "back", "window_title": "OmniCapture - Camera Feed"})
@@ -260,10 +261,33 @@ def interactive_menu(
             p2.wait()
 
         elif choice == "7":
+            print("\n\033[96m[+] Setup Dual Simultaneous Recording (PC Screen + Mobile Camera)\033[0m")
+            print("\033[90mThis will simultaneously record your Windows desktop and mobile camera into 2 separate files.\033[0m\n")
+            facing_in = input("Select Mobile Camera: [1] Back (default) | [2] Front: ").strip()
+            facing = "front" if facing_in == "2" else "back"
+            preview_in = input("Show live mobile camera preview window on PC? (y/n, default y): ").strip().lower() != "n"
+            auto_up = input("Auto-upload both recordings to Google Drive after recording? (y/n, default y): ").strip().lower() != "n"
+            fmt = input("Format: [1] MP4 (default) | [2] MKV (crash-safe): ").strip()
+            fmt_ext = "mkv" if fmt == "2" else "mp4"
+
+            dual_opts = {
+                "device_id": dev_id,
+                "camera_facing": facing,
+                "record_format": fmt_ext,
+                "pc_fps": 30,
+                "camera_fps": 30,
+                "screen_off": True,
+                "no_playback": not preview_in,
+                "audio_source": "mic"
+            }
+            recorder.record_dual_pc_and_mobile_camera(dual_opts, auto_upload=auto_up)
+            input("\nPress Enter to return to menu...")
+
+        elif choice == "8":
             show_hotkeys_guide()
             input("Press Enter to return to menu...")
 
-        elif choice == "8":
+        elif choice == "9":
             print("\n\033[96m[+] Setting up Wireless ADB...\033[0m")
             ok, msg = adb.enable_wireless(dev_id)
             if ok:
@@ -272,10 +296,10 @@ def interactive_menu(
                 print(f"\033[91m[✗] {msg}\033[0m")
             input("\nPress Enter to continue...")
 
-        elif choice == "9":
+        elif choice == "10":
             drive_menu(cfg, uploader)
 
-        elif choice == "10":
+        elif choice == "11":
             show_diagnostics(adb, scrcpy, dev_id)
             input("\nPress Enter to return to menu...")
 
@@ -383,11 +407,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Command: record
     p_rec = subparsers.add_parser("record", help="Record display or camera directly to PC")
-    p_rec.add_argument("source", choices=["screen", "camera"], help="What to record")
-    p_rec.add_argument("--facing", choices=["back", "front"], default="back", help="Camera facing (if source=camera)")
+    p_rec.add_argument("source", choices=["screen", "camera", "dual"], help="What to record: screen (mobile), camera (mobile), or dual (PC screen + mobile camera)")
+    p_rec.add_argument("--facing", choices=["back", "front"], default="back", help="Camera facing (if source=camera or dual)")
     p_rec.add_argument("--format", choices=["mp4", "mkv"], default="mp4", help="Video container format")
     p_rec.add_argument("--upload", action="store_true", help="Auto-upload to Google Drive when finished")
-    p_rec.add_argument("--no-playback", action="store_true", help="Record silently without opening window on PC")
+    p_rec.add_argument("--no-playback", action="store_true", help="Record silently without opening preview window on PC")
+    p_rec.add_argument("--pc-fps", type=int, default=30, help="PC screen frame rate (for source=dual, default: 30)")
+    p_rec.add_argument("--camera-fps", type=int, default=30, help="Mobile camera frame rate (default: 30)")
+    p_rec.add_argument("--camera-size", help="Mobile camera resolution (e.g. 1920x1080)")
+
+    # Command: dual-record
+    p_dual = subparsers.add_parser("dual-record", help="Record PC screen and mobile camera simultaneously to 2 separate files")
+    p_dual.add_argument("--facing", choices=["back", "front"], default="back", help="Mobile camera facing (default: back)")
+    p_dual.add_argument("--format", choices=["mp4", "mkv"], default="mp4", help="Video container format (default: mp4)")
+    p_dual.add_argument("--pc-fps", type=int, default=30, help="PC screen capture frame rate (default: 30)")
+    p_dual.add_argument("--camera-fps", type=int, default=30, help="Mobile camera frame rate (default: 30)")
+    p_dual.add_argument("--camera-size", help="Mobile camera resolution (e.g. 1920x1080)")
+    p_dual.add_argument("--no-camera-playback", action="store_true", help="Record mobile camera silently without preview window")
+    p_dual.add_argument("--upload", action="store_true", help="Auto-upload both recordings to Google Drive when finished")
+    p_dual.add_argument("--device", help="Specific mobile device ID")
 
     # Command: hotkeys
     subparsers.add_parser("hotkeys", help="Display all active keyboard shortcuts and hotkeys")
@@ -454,6 +492,19 @@ def main():
         }
         cmd = scrcpy.build_command("camera", opts)
         scrcpy.run_live(cmd)
+    elif args.command == "dual-record" or (args.command == "record" and args.source == "dual"):
+        dual_opts = {
+            "device_id": target_dev,
+            "camera_facing": getattr(args, "facing", "back"),
+            "camera_size": getattr(args, "camera_size", None),
+            "camera_fps": getattr(args, "camera_fps", 30),
+            "pc_fps": getattr(args, "pc_fps", 30),
+            "record_format": getattr(args, "format", "mp4"),
+            "no_playback": getattr(args, "no_camera_playback", False) or getattr(args, "no_playback", False),
+            "screen_off": True,
+            "audio_source": "mic"
+        }
+        recorder.record_dual_pc_and_mobile_camera(dual_opts, auto_upload=args.upload)
     elif args.command == "record":
         mode = "record_camera" if args.source == "camera" else "record_screen"
         opts = {

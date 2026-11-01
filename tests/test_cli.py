@@ -42,6 +42,22 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(args.facing, "back")
         self.assertTrue(args.no_playback)
 
+    def test_record_dual(self):
+        args = self.parser.parse_args(["record", "dual", "--facing", "front", "--pc-fps", "60", "--upload"])
+        self.assertEqual(args.command, "record")
+        self.assertEqual(args.source, "dual")
+        self.assertEqual(args.facing, "front")
+        self.assertEqual(args.pc_fps, 60)
+        self.assertTrue(args.upload)
+
+    def test_dual_record_command(self):
+        args = self.parser.parse_args(["dual-record", "--facing", "back", "--pc-fps", "30", "--camera-fps", "60", "--format", "mkv"])
+        self.assertEqual(args.command, "dual-record")
+        self.assertEqual(args.facing, "back")
+        self.assertEqual(args.pc_fps, 30)
+        self.assertEqual(args.camera_fps, 60)
+        self.assertEqual(args.format, "mkv")
+
     def test_info_command(self):
         args = self.parser.parse_args(["info"])
         self.assertEqual(args.command, "info")
