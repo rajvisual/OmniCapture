@@ -116,6 +116,41 @@ class StudioStateBanner(ctk.CTkFrame):
             "action_text": "Cancel Upload",
             "details": "Drive REST API v3 chunked upload active."
         },
+        "upload_failed": {
+            "level": "error",
+            "title": "Cloud Upload Failed",
+            "desc": "Google Drive upload was interrupted by network timeout or token expiry.",
+            "action_text": "Retry Upload",
+            "details": "Drive API v3 HTTP 503 Service Unavailable / Socket timeout after 3 chunks. Session cached."
+        },
+        "upload_done": {
+            "level": "success",
+            "title": "Cloud Upload Complete",
+            "desc": "Recording was successfully uploaded to Google Drive folder.",
+            "action_text": "Show in Explorer",
+            "details": "File ID: 1aBcDeFgHiJkLmNoPqRsTuVwXyZ. Destination: Google Drive virtual path verified."
+        },
+        "scrcpy_missing": {
+            "level": "error",
+            "title": "Scrcpy Binary Not Found",
+            "desc": "scrcpy.exe is required for Android display mirroring and Camera2 stream decoding.",
+            "action_text": "Install Guide",
+            "details": "resolve_binary('scrcpy') failed across system PATH and bin/ directory. Minimum version 2.0+ required."
+        },
+        "adb_missing": {
+            "level": "error",
+            "title": "ADB Binary Not Found",
+            "desc": "Android Debug Bridge (adb.exe) is required for device discovery and telemetry.",
+            "action_text": "Install Guide",
+            "details": "resolve_binary('adb') failed across system PATH and bin/ directory. Install Android SDK Platform-Tools."
+        },
+        "engine_crashed": {
+            "level": "error",
+            "title": "Capture Engine Crashed Abruptly",
+            "desc": "An underlying video capture subprocess crashed unexpectedly with a non-zero exit code.",
+            "action_text": "Restart Engine",
+            "details": "Subprocess worker exited unexpectedly with code 0xC0000005 (Access Violation in Direct3D11 graphics driver)."
+        },
         "ffmpeg_missing": {
             "level": "error",
             "title": "FFmpeg Engine Not Found",

@@ -34,7 +34,12 @@ class SimulatedADBManager:
         "battery_good",
         "unplugged_mid_recording",
         "slow_response",
-        "failure"
+        "failure",
+        "upload_failed",
+        "upload_done",
+        "scrcpy_missing",
+        "adb_missing",
+        "engine_crashed"
     ]
 
     def __init__(self, initial_state: str = "connected_usb"):
@@ -60,15 +65,15 @@ class SimulatedADBManager:
                 self._on_state_change_cb(new_state)
 
     def is_available(self) -> bool:
-        return self.state != "failure"
+        return self.state not in ("failure", "adb_missing")
 
     def get_adb_version(self) -> Optional[str]:
-        if self.state == "failure":
+        if self.state in ("failure", "adb_missing"):
             return None
         return "Android Debug Bridge version 1.0.41 (Simulated Device Engine v1.4.0)"
 
     def list_devices(self) -> List[Dict[str, Any]]:
-        if self.state in ("no_device", "scanning", "failure", "unplugged_mid_recording"):
+        if self.state in ("no_device", "scanning", "failure", "unplugged_mid_recording", "adb_missing", "engine_crashed"):
             return []
 
         if self.state == "connecting":
@@ -154,6 +159,30 @@ class SimulatedADBManager:
     def preflight_check(self, device_id: Optional[str] = None) -> Dict[str, Any]:
         if self.state == "slow_response":
             time.sleep(1.2)
+
+        if self.state == "scrcpy_missing":
+            return {
+                "ok": False,
+                "error_type": "SCRCPY_MISSING",
+                "message": "Scrcpy binary not found in system PATH or bin/ folder.",
+                "remedy": "Ensure scrcpy.exe exists in bin/ or run the installer."
+            }
+
+        if self.state == "adb_missing":
+            return {
+                "ok": False,
+                "error_type": "ADB_MISSING",
+                "message": "ADB binary not found in system PATH or bin/ folder.",
+                "remedy": "Install Android SDK Platform-Tools or copy adb.exe to bin/."
+            }
+
+        if self.state == "engine_crashed":
+            return {
+                "ok": False,
+                "error_type": "ENGINE_CRASHED",
+                "message": "Subprocess capture worker exited unexpectedly with code 0xC0000005.",
+                "remedy": "Restart capture engine to re-initialize graphics pipeline."
+            }
 
         if self.state == "failure":
             return {

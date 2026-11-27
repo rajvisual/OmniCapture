@@ -182,10 +182,28 @@ def run_automated_tour():
     snap("04_dark_state_matrix_camera_locked.png")
 
     # 5. State Matrix: Device Detached Mid-Recording
-    print("[5/13] Capturing 05_dark_state_matrix_device_unplugged.png...")
+    print("[5/16] Capturing 05_dark_state_matrix_device_unplugged.png...")
     if hasattr(app, "state_banner"):
         app.state_banner.set_state("device_unplugged")
     snap("05_dark_state_matrix_device_unplugged.png")
+
+    # 5b. State Matrix: Upload Failed
+    print("[5b/16] Capturing 05b_dark_state_upload_failed.png...")
+    if hasattr(app, "state_banner"):
+        app.state_banner.set_state("upload_failed")
+    snap("05b_dark_state_upload_failed.png")
+
+    # 5c. State Matrix: Engine Crashed
+    print("[5c/16] Capturing 05c_dark_state_engine_crashed.png...")
+    if hasattr(app, "state_banner"):
+        app.state_banner.set_state("engine_crashed")
+    snap("05c_dark_state_engine_crashed.png")
+
+    # 5d. State Matrix: Scrcpy Missing
+    print("[5d/16] Capturing 05d_dark_state_scrcpy_missing.png...")
+    if hasattr(app, "state_banner"):
+        app.state_banner.set_state("scrcpy_missing")
+    snap("05d_dark_state_scrcpy_missing.png")
 
     # Reset banner to connected
     if hasattr(app, "state_banner"):

@@ -310,7 +310,7 @@ class UnifiedTopBar(ctk.CTkFrame):
     def _get_help_menu_items(self) -> list:
         h = self.menu_handlers
         return [
-            {"label": "Getting Started Checklist...", "command": h.get("open_onboarding")},
+            {"label": "Getting Started Checklist...", "accelerator": "F1", "command": h.get("open_onboarding")},
             {"separator": True},
             {"label": "Keyboard Shortcuts", "accelerator": "Ctrl+/", "command": h.get("open_hotkeys_guide")},
             {"label": "Hardware Diagnostics", "command": h.get("open_diagnostics")},

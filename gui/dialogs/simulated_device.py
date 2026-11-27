@@ -81,6 +81,13 @@ class SimulatedDeviceControlDialog(ctk.CTkToplevel):
                 ("battery_low", "Battery Level Low (12%)", "Critical battery telemetry alert"),
                 ("slow_response", "High Latency Response (+1.5s delay)", "Simulates slow ADB daemon response"),
                 ("failure", "USB Bus I/O Hardware Failure", "Simulates bus reset / driver error"),
+            ]),
+            ("Cloud & Engine Failure States", [
+                ("upload_failed", "Cloud Upload Failed (Timeout)", "Simulates Google Drive upload error with one-click Retry"),
+                ("upload_done", "Cloud Upload Complete", "Simulates upload completion with Show in Explorer action"),
+                ("scrcpy_missing", "Scrcpy Binary Missing", "Simulates missing scrcpy.exe with installer guidance"),
+                ("adb_missing", "ADB Binary Missing", "Simulates missing adb.exe with SDK guidance"),
+                ("engine_crashed", "Engine Subprocess Crashed", "Simulates worker crash with Restart Engine & Copy details"),
             ])
         ]
 

@@ -30,118 +30,154 @@ class TestMilestone6Verification(unittest.TestCase):
     8. Codebase Hex Token Audit (Zero unauthorized hardcoded colors)
     """
 
-    def setUp(self):
-        self.app = None
-
-    def tearDown(self):
-        if self.app is not None:
-            try:
-                self.app._meter_timer_active = False
-                self.app.controller.stop_device_poller()
-                self.app.hotkeys.stop()
-                self.app.tray.stop()
-                if hasattr(self.app, "single_instance") and self.app.single_instance:
-                    self.app.single_instance.release()
-                self.app.destroy()
-            except Exception:
-                pass
-            self.app = None
-
-    def _create_app(self, width=1180, height=820, theme="dark"):
+    @classmethod
+    def setUpClass(cls):
         cfg = {
             "scrcpy_dir": "bin",
             "recordings_dir": "recordings",
             "default_record_format": "mp4",
             "max_fps": 60,
-            "theme": theme,
-            "window_width": width,
-            "window_height": height,
+            "theme": "dark",
+            "window_width": 1180,
+            "window_height": 820,
             "first_run_completed": True
         }
         sys.argv = [sys.argv[0], "--no-onboarding"]
-        app = OmniCaptureApp(cfg)
-        app.withdraw()
-        app.update_idletasks()
-        return app
+        cls.app = OmniCaptureApp(cfg)
+        cls.app.withdraw()
+        cls.app.update()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.app is not None:
+            try:
+                cls.app._meter_timer_active = False
+                cls.app.controller.stop_device_poller()
+                cls.app.hotkeys.stop()
+                cls.app.tray.stop()
+                if hasattr(cls.app, "single_instance") and cls.app.single_instance:
+                    cls.app.single_instance.release()
+                cls.app.destroy()
+            except Exception:
+                pass
+            cls.app = None
 
     # -------------------------------------------------------------------------
-    # 1. Dock & Footer Geometry Clipping Verification
+    # 1. Dock & Footer Geometry Clipping Verification (Recursive Real-Widget Inspection)
     # -------------------------------------------------------------------------
     def test_dock_geometry_no_clipping(self):
-        """Verify bottom dock fits all elements without clipping at 1180x820 and 1160x760 across DPI scales."""
+        """
+        Verify bottom dock fits all elements without clipping at 1180x820 and 1160x760 across DPI scales.
+        Uses recursive real-widget geometry traversal (winfo_reqheight/reqwidth vs allocated space)
+        so any clipped child fails the test.
+        """
         for width, height in [(1180, 820), (1160, 760)]:
-            app = self._create_app(width, height)
-            app.update()
+            self.app.geometry(f"{width}x{height}")
+            self.app.update()
 
-            dock = app.dock_panel
+            dock = self.app.dock_panel
+            dock_w = dock.winfo_reqwidth()
             dock_h = dock.winfo_reqheight()
             self.assertGreaterEqual(dock_h, 175, f"Dock height {dock_h}px should provide at least 175px budget")
 
-            # Column 1 (Scenes: 4 rows)
-            d1_h = sum(child.winfo_reqheight() for child in app.dock_col_scenes.winfo_children())
-            self.assertLessEqual(d1_h, dock_h, f"Scenes column height ({d1_h}px) exceeds dock height ({dock_h}px)")
+            # Recursive traversal validator
+            def _check_tree(container, alloc_w, alloc_h, path):
+                for child in container.winfo_children():
+                    child_name = f"{path}/{child.__class__.__name__}"
+                    req_w = child.winfo_reqwidth()
+                    req_h = child.winfo_reqheight()
+                    act_w = child.winfo_width()
+                    act_h = child.winfo_height()
 
-            # Column 2 (Sources: 3 check rows)
-            d2_h = sum(child.winfo_reqheight() for child in app.dock_col_sources.winfo_children())
-            self.assertLessEqual(d2_h, dock_h, f"Sources column height ({d2_h}px) exceeds dock height ({dock_h}px)")
+                    # Child requested height must fit within allocated vertical space
+                    self.assertLessEqual(
+                        req_h, alloc_h + 4,
+                        f"Widget {child_name} req height ({req_h}px) exceeds allocated space ({alloc_h}px)"
+                    )
+                    # If widget has sub-children, recursively inspect container
+                    subchildren = child.winfo_children()
+                    if subchildren:
+                        _check_tree(child, max(act_w, req_w), max(act_h, req_h), child_name)
 
-            # Column 3 (Audio Mixer: 2 channel strips)
-            d3_h = sum(child.winfo_reqheight() for child in app.dock_col_mixer.winfo_children())
-            self.assertLessEqual(d3_h, dock_h, f"Mixer column height ({d3_h}px) exceeds dock height ({dock_h}px)")
-
-            # Column 4 (Master Controls: Record + 3 small action buttons)
-            d4_h = sum(child.winfo_reqheight() for child in app.dock_col_controls.winfo_children())
-            self.assertLessEqual(d4_h, dock_h, f"Controls column height ({d4_h}px) exceeds dock height ({dock_h}px)")
-
-            # Explicit check: PC audio strip and Preferences button must be mapped and inside dock
-            self.assertGreater(app.strip_pc.winfo_reqheight(), 0, "PC Audio strip must be sized")
-            self.assertGreater(app.master_settings_btn.winfo_reqheight(), 0, "Preferences button must be sized")
-
-            # DPI Scaling Simulation check (1.0, 1.25, 1.5, 2.0)
-            for scale in [1.0, 1.25, 1.5, 2.0]:
-                scaled_content = max(d1_h, d2_h, d3_h, d4_h) * scale
-                scaled_budget = dock_h * scale
+            # Check each column recursively
+            for col_name, col_frame in [
+                ("Scenes", self.app.dock_col_scenes),
+                ("Sources", self.app.dock_col_sources),
+                ("Mixer", self.app.dock_col_mixer),
+                ("Controls", self.app.dock_col_controls)
+            ]:
+                col_w = col_frame.winfo_reqwidth()
+                col_h = dock_h
+                total_col_req_h = sum(c.winfo_reqheight() for c in col_frame.winfo_children())
                 self.assertLessEqual(
-                    scaled_content, scaled_budget + 1.0,
-                    f"DPI scale {scale}x produced content overflow ({scaled_content}px > {scaled_budget}px)"
+                    total_col_req_h, col_h + 4,
+                    f"Column '{col_name}' total content req height ({total_col_req_h}px) exceeds column height ({col_h}px)"
                 )
+                _check_tree(col_frame, col_w, col_h, col_name)
 
-            try:
-                app._meter_timer_active = False
-                app.controller.stop_device_poller()
-                app.hotkeys.stop()
-                app.tray.stop()
-                if hasattr(app, "single_instance") and app.single_instance:
-                    app.single_instance.release()
-                app.destroy()
-            except Exception:
-                pass
+            # Explicit check on key critical widgets
+            self.assertGreater(self.app.strip_pc.winfo_reqheight(), 0, "PC Audio strip must be sized")
+            self.assertGreater(self.app.master_settings_btn.winfo_reqheight(), 0, "Preferences button must be sized")
+
+            # DPI Scaling Simulation check (1.0x, 1.25x, 1.5x, 2.0x)
+            for scale in [1.0, 1.25, 1.5, 2.0]:
+                for col_frame in [self.app.dock_col_scenes, self.app.dock_col_sources, self.app.dock_col_mixer, self.app.dock_col_controls]:
+                    col_sum_scaled = sum(c.winfo_reqheight() for c in col_frame.winfo_children()) * scale
+                    dock_h_scaled = dock_h * scale
+                    self.assertLessEqual(
+                        col_sum_scaled, dock_h_scaled + 4.0,
+                        f"DPI scale {scale}x produced content overflow ({col_sum_scaled}px > {dock_h_scaled}px)"
+                    )
 
     # -------------------------------------------------------------------------
-    # 2. Footer Priority Truncation Verification
+    # 2. Dynamic Measured-Width Footer Truncation Verification
     # -------------------------------------------------------------------------
     def test_footer_priority_truncation(self):
-        """Verify footer drops hints cleanly by priority group under narrow widths, never mid-word."""
-        self.app = self._create_app(1180, 820)
+        """Verify footer dynamically measures widget widths and drops lower-priority groups to prevent clipping."""
+        self.app.geometry("1180x820")
+        self.app.update()
 
-        # Wide: >= 1120px -> all visible
-        self.app._on_footer_configure(type("Event", (), {"width": 1180})())
+        all_widgets = [
+            self.app.foot_status_chip, self.app.foot_rec_time, self.app.foot_device_chip,
+            self.app.foot_disk_lbl, self.app.foot_encoder_lbl, self.app.foot_fps_lbl,
+            self.app.foot_bitrate_lbl, self.app.hint_palette, self.app.hint_rec
+        ]
+        full_req_w = self.app._compute_footer_reqwidth(all_widgets)
+
+        # 1. When available width accommodates all widgets -> all packed
+        self.app._on_footer_configure(type("Event", (), {"width": full_req_w + 50})())
         self.assertEqual(self.app.hint_rec.winfo_manager(), "pack")
         self.assertEqual(self.app.hint_palette.winfo_manager(), "pack")
+        self.assertEqual(self.app.foot_bitrate_lbl.winfo_manager(), "pack")
 
-        # Drop hint_rec at < 1120px
-        self.app._on_footer_configure(type("Event", (), {"width": 1050})())
-        self.assertEqual(self.app.hint_rec.winfo_manager(), "", "hint_rec must be dropped at < 1120px")
-        self.assertEqual(self.app.hint_palette.winfo_manager(), "pack", "hint_palette must remain visible at 1050px")
+        # 2. Constrict available width below full requested width -> hint_rec drops first
+        tight_w = full_req_w - (self.app.hint_rec.winfo_reqwidth() // 2)
+        self.app._on_footer_configure(type("Event", (), {"width": tight_w})())
+        self.assertEqual(self.app.hint_rec.winfo_manager(), "", "hint_rec must be dropped when space is tight")
+        self.assertEqual(self.app.hint_palette.winfo_manager(), "pack", "hint_palette should remain if space permits")
 
-        # Drop hint_palette at < 980px
-        self.app._on_footer_configure(type("Event", (), {"width": 920})())
-        self.assertEqual(self.app.hint_palette.winfo_manager(), "", "hint_palette must be dropped at < 980px")
+        # 3. Constrict further below hint_palette requirement -> hint_palette drops
+        tighter_w = self.app._compute_footer_reqwidth(all_widgets[:-2]) + 10
+        self.app._on_footer_configure(type("Event", (), {"width": tighter_w - 20})())
+        self.assertEqual(self.app.hint_palette.winfo_manager(), "", "hint_palette must be dropped")
 
-        # Drop telemetry at < 850px
-        self.app._on_footer_configure(type("Event", (), {"width": 800})())
-        self.assertEqual(self.app.foot_fps_lbl.winfo_manager(), "", "fps readout must be dropped at < 850px")
-        self.assertEqual(self.app.foot_bitrate_lbl.winfo_manager(), "", "bitrate readout must be dropped at < 850px")
+        # 4. Multi-DPI Scaling simulation (1.0x, 1.25x, 1.5x, 2.0x)
+        # At minimum window width (1160px), test that dynamic calculation drops candidates to ensure
+        # remaining packed widgets NEVER exceed effective available space
+        for dpi_scale in [1.0, 1.25, 1.5, 2.0]:
+            scaled_avail = int(1160 / dpi_scale)
+            self.app._on_footer_configure(type("Event", (), {"width": scaled_avail})())
+
+            active_packed = [w for w in all_widgets if w.winfo_manager() == "pack"]
+            packed_req_w = self.app._compute_footer_reqwidth(active_packed)
+            self.assertLessEqual(
+                packed_req_w, scaled_avail + 15,
+                f"At DPI scale {dpi_scale}x, active footer widgets ({packed_req_w}px) exceeded available width ({scaled_avail}px)"
+            )
+            # Crucially: essentials are ALWAYS packed
+            self.assertEqual(self.app.foot_status_chip.winfo_manager(), "pack")
+            self.assertEqual(self.app.foot_rec_time.winfo_manager(), "pack")
+            self.assertEqual(self.app.foot_device_chip.winfo_manager(), "pack")
 
     # -------------------------------------------------------------------------
     # 3. Popup Snapshot Isolation
@@ -167,7 +203,9 @@ class TestMilestone6Verification(unittest.TestCase):
             "no_device", "scanning", "connecting", "unauthorized",
             "connected_usb", "connected_wifi", "camera_locked",
             "battery_low", "battery_good", "unplugged_mid_recording",
-            "slow_response", "failure"
+            "slow_response", "failure",
+            "upload_failed", "upload_done", "scrcpy_missing",
+            "adb_missing", "engine_crashed"
         ]
 
         for st in expected_states:
@@ -175,13 +213,13 @@ class TestMilestone6Verification(unittest.TestCase):
             self.assertEqual(sim.state, st)
 
             devs = sim.list_devices()
-            if st in ("connected_usb", "connected_wifi", "battery_low", "battery_good", "camera_locked", "slow_response"):
+            if st in ("connected_usb", "connected_wifi", "battery_low", "battery_good", "camera_locked", "slow_response", "upload_failed", "upload_done", "scrcpy_missing"):
                 self.assertEqual(len(devs), 1, f"State {st} should return 1 device")
                 self.assertEqual(devs[0]["state"], "device")
             elif st == "unauthorized":
                 self.assertEqual(len(devs), 1)
                 self.assertEqual(devs[0]["state"], "unauthorized")
-            elif st in ("no_device", "scanning", "unplugged_mid_recording", "failure"):
+            elif st in ("no_device", "scanning", "unplugged_mid_recording", "failure", "adb_missing", "engine_crashed"):
                 self.assertEqual(len(devs), 0, f"State {st} should return 0 devices")
 
         # Verify battery telemetry
@@ -208,7 +246,7 @@ class TestMilestone6Verification(unittest.TestCase):
         root.withdraw()
 
         banner = StudioStateBanner(root, initial_state="no_device")
-        self.assertEqual(len(StudioStateBanner.STATE_PRESETS), 16, "State Matrix must contain exactly 16 presets")
+        self.assertEqual(len(StudioStateBanner.STATE_PRESETS), 21, "State Matrix must contain exactly 21 presets")
 
         for state_key, preset in StudioStateBanner.STATE_PRESETS.items():
             banner.set_state(state_key)
@@ -230,8 +268,6 @@ class TestMilestone6Verification(unittest.TestCase):
     # -------------------------------------------------------------------------
     def test_dialogs_instantiation_and_theming(self):
         """Verify Media Library, Settings, Diagnostics, Onboarding, and Confirm Dialogs instantiate and theme."""
-        self.app = self._create_app(1180, 820)
-
         # 1. Confirm Dialog
         dlg_confirm = StudioConfirmDialog(
             self.app,

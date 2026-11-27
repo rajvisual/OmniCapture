@@ -965,10 +965,74 @@ class OmniCaptureApp(ctk.CTk):
         # Priority-based truncation: hide hints first when width is tight, never cut mid-word
         self.footer.bind("<Configure>", self._on_footer_configure, add="+")
 
+    def _compute_footer_reqwidth(self, widgets: list) -> int:
+        """Calculate the total physical pixel width requested by a set of footer widgets."""
+        total = 32 # Left (16px) and right (16px) outer edge margins
+        for w in widgets:
+            if hasattr(w, "winfo_reqwidth"):
+                total += w.winfo_reqwidth() + 14 # Include inter-item horizontal padding
+        return total
+
     def _on_footer_configure(self, event):
-        w = event.width
-        # Priority 1: When width is tight (< 1120px), drop Record hint
-        if w < 1120:
+        """
+        Dynamic Measured-Width Footer Truncation Engine.
+        Directly compares the live measured pixel widths (winfo_reqwidth) of all footer groups
+        against the currently available pixel width, eliminating fragile hardcoded thresholds.
+        Guarantees zero clipping and clean whole-group dropping across 100%, 125%, 150%, and 200% DPI.
+        """
+        avail_w = event.width
+        if avail_w <= 1:
+            return
+
+        # Baseline essential studio telemetry (never dropped)
+        essentials = [self.foot_status_chip, self.foot_rec_time, self.foot_device_chip]
+
+        # Prioritized optional groups: lowest priority is dropped first when available width is tight
+        # Priority order to drop:
+        # 1. hint_rec (Ctrl+Alt+D)
+        # 2. hint_palette (Ctrl+P)
+        # 3. foot_bitrate_lbl (Bitrate readout)
+        # 4. foot_fps_lbl (FPS readout)
+        # 5. foot_encoder_lbl (Encoder chip)
+        # 6. foot_disk_lbl (Disk free space)
+        optional_candidates = [
+            self.hint_rec,
+            self.hint_palette,
+            self.foot_bitrate_lbl,
+            self.foot_fps_lbl,
+            self.foot_encoder_lbl,
+            self.foot_disk_lbl
+        ]
+
+        current_active = essentials + optional_candidates
+        dropped = set()
+
+        for candidate in optional_candidates:
+            active_subset = [w for w in current_active if w not in dropped]
+            if self._compute_footer_reqwidth(active_subset) > avail_w:
+                dropped.add(candidate)
+            else:
+                break
+
+        # Apply geometry manager states based on dynamic measurements
+        # Left-docked telemetry items:
+        for w in [self.foot_disk_lbl, self.foot_encoder_lbl, self.foot_fps_lbl, self.foot_bitrate_lbl]:
+            if w in dropped:
+                if w.winfo_manager() == "pack":
+                    w.pack_forget()
+            else:
+                if not w.winfo_manager():
+                    w.pack(side="left", padx=10)
+
+        # Right-docked keyboard accelerator hints:
+        if self.hint_palette in dropped:
+            if self.hint_palette.winfo_manager() == "pack":
+                self.hint_palette.pack_forget()
+        else:
+            if not self.hint_palette.winfo_manager():
+                self.hint_palette.pack(side="right", padx=(4, 0))
+
+        if self.hint_rec in dropped:
             if self.hint_rec.winfo_manager() == "pack":
                 self.hint_rec.pack_forget()
             if hasattr(self, "hint_palette"):
@@ -978,26 +1042,6 @@ class OmniCaptureApp(ctk.CTk):
                 self.hint_rec.pack(side="right", padx=(4, 16))
             if hasattr(self, "hint_palette"):
                 self.hint_palette.configure(text="Ctrl+P: Palette  ·")
-
-        # Priority 2: When width is narrower (< 980px), drop Palette hint too
-        if w < 980:
-            if self.hint_palette.winfo_manager() == "pack":
-                self.hint_palette.pack_forget()
-        else:
-            if not self.hint_palette.winfo_manager():
-                self.hint_palette.pack(side="right", padx=(4, 0))
-
-        # Priority 3: When width is very narrow (< 850px), hide bitrate & fps labels
-        if w < 850:
-            if self.foot_bitrate_lbl.winfo_manager() == "pack":
-                self.foot_bitrate_lbl.pack_forget()
-            if self.foot_fps_lbl.winfo_manager() == "pack":
-                self.foot_fps_lbl.pack_forget()
-        else:
-            if not self.foot_fps_lbl.winfo_manager():
-                self.foot_fps_lbl.pack(side="left", padx=10)
-            if not self.foot_bitrate_lbl.winfo_manager():
-                self.foot_bitrate_lbl.pack(side="left", padx=10)
 
     def _refresh_encoder_chip(self):
         try:
@@ -1220,10 +1264,9 @@ class OmniCaptureApp(ctk.CTk):
         SimulatedDeviceControlDialog(self, self._sim_engine, on_state_change=self._on_simulated_state_change)
 
     def _on_simulated_state_change(self, state_id: str):
-        if state_id == "camera_locked":
-            self.state_banner.set_state("camera_locked")
-        elif state_id == "unplugged_mid_recording":
-            self.state_banner.set_state("device_unplugged")
+        if hasattr(self, "state_banner") and self.state_banner and state_id in self.state_banner.STATE_PRESETS:
+            self.state_banner.set_state(state_id)
+        if state_id == "unplugged_mid_recording":
             self.notifications.notify("Device Disconnected", "USB connection was lost mid-recording", level="warning")
         elif state_id == "battery_low":
             self.top_bar.set_device_status("● POCO X6 Pro (USB Direct) · 12% ⚡")
@@ -1234,6 +1277,8 @@ class OmniCaptureApp(ctk.CTk):
             self.toasts.show("ADB Latency", "Device response latency +1.5s", level="warning")
         elif state_id == "failure":
             self.state_banner.set_state("device_unplugged", custom_desc="USB Bus hardware failure detected. Reconnect USB cable.")
+        elif state_id == "engine_crashed":
+            self.notifications.notify("Engine Crash", "Video capture worker crashed with code 0xC0000005", level="error")
         self.controller.refresh_device_now()
 
     def _open_onboarding_dialog(self):
@@ -1262,15 +1307,22 @@ class OmniCaptureApp(ctk.CTk):
             self._open_settings_window()
         elif state_name == "disk_full":
             self._open_recordings_window()
-        elif state_name == "ffmpeg_missing":
+        elif state_name in ("ffmpeg_missing", "scrcpy_missing", "adb_missing"):
             self._open_diagnostics_window()
+        elif state_name == "upload_failed":
+            self.toasts.show("Cloud Upload", "Retrying Google Drive upload...", level="info")
+        elif state_name == "upload_done":
+            self.controller.open_recordings_folder()
+        elif state_name == "engine_crashed":
+            self._on_manual_refresh()
+            self.toasts.show("Engine Reset", "Capture worker subprocess restarted", level="success")
         else:
             self.toasts.show("Studio Action", f"Action triggered for state: {state_name}", level="info")
 
     def _open_hotkeys_guide(self):
         w = ctk.CTkToplevel(self)
-        w.title("Keyboard Shortcuts")
-        w.geometry("440x360")
+        w.title("Keyboard Shortcuts & Hotkeys")
+        w.geometry("500x480")
         w.resizable(False, False)
         tokens = OmniTheme.get_tokens()
         w.configure(fg_color=tokens.bg_root)
@@ -1278,26 +1330,33 @@ class OmniCaptureApp(ctk.CTk):
         box = ctk.CTkFrame(w, fg_color=tokens.bg_panel, corner_radius=OmniTheme.RADIUS_CARD)
         box.pack(fill="both", expand=True, padx=16, pady=16)
 
-        ctk.CTkLabel(box, text="Global Keyboard Shortcuts", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=14, pady=(12, 8))
+        ctk.CTkLabel(box, text="Keyboard Shortcuts & System Hotkeys", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=14, pady=(12, 6))
+
+        scroll = ctk.CTkScrollableFrame(box, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=4, pady=4)
 
         shortcuts = [
-            ("Ctrl + P", "Open Command Palette"),
-            ("Ctrl + Alt + D", "Start / Stop Dual Recording"),
-            ("Ctrl + Alt + M", "Launch Screen Mirror"),
-            ("Ctrl + Alt + C", "Launch Camera Viewfinder"),
-            ("Ctrl + Alt + R", "Open Recordings Folder"),
-            ("Ctrl + Shift + L", "Release Camera Sensor Lock"),
-            ("F5", "Refresh Connected Devices"),
+            ("Ctrl + P / Ctrl + K", "Open Studio Command Palette"),
+            ("F1", "Getting Started Setup Checklist"),
+            ("Ctrl + /", "Open Keyboard Shortcuts Guide"),
+            ("Ctrl + Alt + D", "Start / Stop Dual Recording (Global Hotkey)"),
+            ("Ctrl + Alt + M", "Launch Display Mirror (Global Hotkey)"),
+            ("Ctrl + Alt + C", "Launch Camera Viewfinder (Global Hotkey)"),
+            ("Ctrl + Alt + R", "Open Recordings Folder (Global Hotkey)"),
+            ("Ctrl + Shift + L", "Release Camera Sensor Hardware Lock"),
+            ("F5", "Refresh Connected Android Devices"),
             ("1 / 2 / 3 / 4", "Switch Active Studio Scene"),
-            ("Ctrl + ,", "Open Preferences Dialog"),
-            ("Ctrl + W", "Minimize to System Tray"),
-            ("Ctrl + Q", "Exit Application"),
+            ("Ctrl + ,", "Open Studio Preferences Dialog"),
+            ("Esc", "Stop Active Capture / Close Popups"),
+            ("Alt + F / C / T / V / S / H", "Windows Standard Menu Mnemonics"),
+            ("Ctrl + W", "Minimize Application to System Tray"),
+            ("Ctrl + Q", "Exit Application Cleanly"),
         ]
 
         for key, desc in shortcuts:
-            r = ctk.CTkFrame(box, fg_color="transparent")
-            r.pack(fill="x", padx=14, pady=3)
-            ctk.CTkLabel(r, text=key, font=OmniTheme.font_mono(10, weight="bold"), text_color=tokens.accent_primary, width=140, anchor="w").pack(side="left")
+            r = ctk.CTkFrame(scroll, fg_color="transparent")
+            r.pack(fill="x", padx=10, pady=2)
+            ctk.CTkLabel(r, text=key, font=OmniTheme.font_mono(10, weight="bold"), text_color=tokens.accent_primary, width=170, anchor="w").pack(side="left")
             ctk.CTkLabel(r, text=desc, font=OmniTheme.font_body(), text_color=tokens.text_secondary).pack(side="left")
 
     def _open_about_dialog(self):
@@ -1320,16 +1379,25 @@ class OmniCaptureApp(ctk.CTk):
         ComponentGalleryWindow(self)
 
     def _bind_keyboard_shortcuts(self):
+        # Command Palette
         self.bind("<Control-p>", lambda e: self._open_command_palette())
         self.bind("<Control-P>", lambda e: self._open_command_palette())
         self.bind("<Control-Shift-P>", lambda e: self._open_command_palette())
         self.bind("<Control-Shift-p>", lambda e: self._open_command_palette())
         self.bind("<Control-k>", lambda e: self._open_command_palette())
         self.bind("<Control-K>", lambda e: self._open_command_palette())
+
+        # General Studio Actions
+        self.bind("<F1>", lambda e: self._open_onboarding_dialog())
         self.bind("<F5>", lambda e: self._on_manual_refresh())
         self.bind("<Control-comma>", lambda e: self._open_settings_window())
         self.bind("<Control-q>", lambda e: self._on_app_exit())
         self.bind("<Control-w>", lambda e: self._on_minimize_to_tray())
+        self.bind("<Control-slash>", lambda e: self._open_hotkeys_guide())
+        self.bind("<Control-question>", lambda e: self._open_hotkeys_guide())
+        self.bind("<Control-Shift-L>", lambda e: self._on_release_lock())
+        self.bind("<Control-Shift-l>", lambda e: self._on_release_lock())
+        self.bind("<Escape>", lambda e: self._on_escape_pressed())
 
         # Alt-Key Menu Mnemonics (Windows 11 Standard)
         for key, menu_name in [
@@ -1343,6 +1411,21 @@ class OmniCaptureApp(ctk.CTk):
         self.bind("2", lambda e: self._select_scene("mirror") if not self._is_entry_focused() else None)
         self.bind("3", lambda e: self._select_scene("camera") if not self._is_entry_focused() else None)
         self.bind("4", lambda e: self._select_scene("screen") if not self._is_entry_focused() else None)
+
+    def _on_escape_pressed(self):
+        """Handle Escape key: close active palette/dropdown, or stop recording if active."""
+        if hasattr(self, "palette") and self.palette:
+            self.palette.close()
+            return
+        if hasattr(self, "top_bar") and self.top_bar and self.top_bar.active_dropdown:
+            try:
+                self.top_bar.active_dropdown.close()
+            except Exception:
+                pass
+            self.top_bar.active_dropdown = None
+            return
+        if self.controller.is_dual_recording():
+            self._on_stop_dual_recording()
 
     def _is_entry_focused(self) -> bool:
         try:
