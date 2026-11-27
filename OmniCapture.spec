@@ -52,7 +52,6 @@ hiddenimports = [
     "gui.dialogs.diagnostics",
     "gui.dialogs.onboarding",
     "gui.dialogs.simulated_device",
-    "gui.dialogs.confirm_dialog",
     "gui.menu_bar",
 ] + ctk_hiddenimports
 
