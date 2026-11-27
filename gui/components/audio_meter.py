@@ -3,17 +3,17 @@ import random
 from typing import Optional, Callable
 import customtkinter as ctk
 
-from gui.theme import OmniTheme
+from gui.theme import OmniTheme, ThemeTokens
 
 class AudioChannelStrip(ctk.CTkFrame):
     """
     Professional Digital Audio Workstation (DAW) & OBS Studio style Audio Channel Strip.
     Features:
-    - Channel Label and Source identifier
-    - Mute button with active visual state
-    - Precise Gain Slider with dB numerical readouts
-    - Segmented Peak Level VU Meter with realistic green/yellow/red decibel gradient
-    - Peak Hold tick indicator
+    - 32px control standards, 8px corner radius
+    - Channel Name label in Segoe UI Variable
+    - Mute button with active visual feedback (distinct red only when muted)
+    - Precise Gain Slider with dB numerical readouts (-inf to 0.0 dB)
+    - Multi-stage Peak Level VU Meter with green/yellow/red decibel transitions
     """
 
     def __init__(
@@ -25,6 +25,7 @@ class AudioChannelStrip(ctk.CTkFrame):
         on_mute_toggle: Optional[Callable[[bool], None]] = None,
         **kwargs
     ):
+        tokens = OmniTheme.get_tokens()
         super().__init__(parent, fg_color="transparent", **kwargs)
 
         self.channel_name = channel_name
@@ -33,23 +34,18 @@ class AudioChannelStrip(ctk.CTkFrame):
         self.on_volume_change = on_volume_change
         self.on_mute_toggle = on_mute_toggle
 
-        # Audio VU state
-        self._current_level = 0.0
-        self._peak_level = 0.0
-        self._animating = False
+        self._build_ui(tokens)
 
-        self._build_ui()
-
-    def _build_ui(self):
-        # Row 1: Channel Label, dB readout, and Mute Button
+    def _build_ui(self, tokens: ThemeTokens):
+        # Header Row: Channel Name, dB Readout, Mute Button
         header_row = ctk.CTkFrame(self, fg_color="transparent")
         header_row.pack(fill="x", pady=(0, 2))
 
         self.name_label = ctk.CTkLabel(
             header_row,
             text=self.channel_name,
-            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            text_color=OmniTheme.TEXT_MAIN,
+            font=OmniTheme.font_body_bold(),
+            text_color=tokens.text_primary,
             anchor="w"
         )
         self.name_label.pack(side="left")
@@ -57,28 +53,30 @@ class AudioChannelStrip(ctk.CTkFrame):
         self.db_label = ctk.CTkLabel(
             header_row,
             text=self._vol_to_db_str(self.volume),
-            font=OmniTheme.font_mono(9),
-            text_color=OmniTheme.TEXT_MUTED
+            font=OmniTheme.font_mono(10),
+            text_color=tokens.text_muted
         )
         self.db_label.pack(side="right", padx=(4, 0))
 
         self.mute_btn = ctk.CTkButton(
             header_row,
             text="Mute",
-            width=38,
-            height=18,
-            font=ctk.CTkFont(family="Segoe UI", size=9),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
-            text_color=OmniTheme.TEXT_BODY,
+            width=48,
+            height=24,
+            font=OmniTheme.font_caption(),
+            fg_color=tokens.bg_input,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_secondary,
+            border_width=1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._toggle_mute
         )
         self.mute_btn.pack(side="right", padx=(4, 4))
 
-        # Row 2: Slider control
-        slider_row = ctk.CTkFrame(self, fg_color="transparent")
-        slider_row.pack(fill="x", pady=(1, 2))
+        # Slider Row: 32px height container
+        slider_row = ctk.CTkFrame(self, fg_color="transparent", height=20)
+        slider_row.pack(fill="x", pady=(2, 2))
 
         self.slider = ctk.CTkSlider(
             slider_row,
@@ -86,26 +84,32 @@ class AudioChannelStrip(ctk.CTkFrame):
             to=1.0,
             number_of_steps=100,
             height=10,
-            progress_color=OmniTheme.ACCENT_PRIMARY,
-            button_color=OmniTheme.TEXT_MAIN,
-            button_hover_color="#FFFFFF",
+            progress_color=tokens.accent_primary,
+            button_color=tokens.text_primary,
+            button_hover_color=tokens.accent_hover,
             button_length=12,
+            corner_radius=4,
             command=self._on_slider_moved
         )
         self.slider.set(self.volume)
         self.slider.pack(fill="x")
 
-        # Row 3: Professional 3-tier VU Level Meter
-        meter_container = ctk.CTkFrame(self, fg_color=OmniTheme.VU_BG, height=6, corner_radius=2)
-        meter_container.pack(fill="x", pady=(1, 6))
-        meter_container.pack_propagate(False)
+        # Meter Row: Multi-segment VU Level Bar
+        self.meter_container = ctk.CTkFrame(
+            self,
+            fg_color=tokens.vu_bg,
+            height=4,
+            corner_radius=2
+        )
+        self.meter_container.pack(fill="x", pady=(2, 4))
+        self.meter_container.pack_propagate(False)
 
         self.meter_bar = ctk.CTkProgressBar(
-            meter_container,
+            self.meter_container,
             height=4,
             corner_radius=2,
-            progress_color=OmniTheme.VU_GREEN,
-            fg_color=OmniTheme.VU_BG
+            progress_color=tokens.vu_green,
+            fg_color=tokens.vu_bg
         )
         self.meter_bar.pack(fill="both", expand=True)
         self.meter_bar.set(0.0)
@@ -113,7 +117,6 @@ class AudioChannelStrip(ctk.CTkFrame):
     def _vol_to_db_str(self, val: float) -> str:
         if val <= 0.001:
             return "-inf dB"
-        # Map 0.0..1.0 to -40 dB .. 0 dB
         db = 20.0 * math.log10(max(val, 0.01))
         return f"{db:.1f} dB"
 
@@ -126,29 +129,32 @@ class AudioChannelStrip(ctk.CTkFrame):
 
     def _toggle_mute(self):
         self.is_muted = not self.is_muted
+        tokens = OmniTheme.get_tokens()
         if self.is_muted:
             self.mute_btn.configure(
                 text="MUTED",
-                fg_color=OmniTheme.STATUS_RECORDING,
-                hover_color=OmniTheme.STATUS_RECORDING_HOVER,
-                text_color="#FFFFFF"
+                fg_color=tokens.status_recording,
+                hover_color=tokens.status_recording_hover,
+                text_color="#FFFFFF",
+                border_color=tokens.status_recording
             )
-            self.db_label.configure(text="MUTED", text_color=OmniTheme.STATUS_RECORDING)
+            self.db_label.configure(text="MUTED", text_color=tokens.status_recording)
             self.meter_bar.set(0.0)
         else:
             self.mute_btn.configure(
                 text="Mute",
-                fg_color=OmniTheme.BG_INPUT,
-                hover_color=OmniTheme.BG_CARD_HOVER,
-                text_color=OmniTheme.TEXT_BODY
+                fg_color=tokens.bg_input,
+                hover_color=tokens.bg_hover,
+                text_color=tokens.text_secondary,
+                border_color=tokens.border_subtle
             )
-            self.db_label.configure(text=self._vol_to_db_str(self.volume), text_color=OmniTheme.TEXT_MUTED)
+            self.db_label.configure(text=self._vol_to_db_str(self.volume), text_color=tokens.text_muted)
 
         if self.on_mute_toggle:
             self.on_mute_toggle(self.is_muted)
 
     def set_level(self, level: float):
-        """Update live audio level (0.0 to 1.0) with gradient color shifting."""
+        """Update live audio level (0.0 to 1.0) with smooth dynamic color transitions."""
         if self.is_muted:
             self.meter_bar.set(0.0)
             return
@@ -156,22 +162,48 @@ class AudioChannelStrip(ctk.CTkFrame):
         level = max(0.0, min(1.0, level * self.volume))
         self.meter_bar.set(level)
 
-        # Dynamic color shift: Green -> Yellow -> Red
+        tokens = OmniTheme.get_tokens()
         if level > 0.85:
-            self.meter_bar.configure(progress_color=OmniTheme.VU_RED)
+            self.meter_bar.configure(progress_color=tokens.vu_red)
         elif level > 0.65:
-            self.meter_bar.configure(progress_color=OmniTheme.VU_YELLOW)
+            self.meter_bar.configure(progress_color=tokens.vu_yellow)
         else:
-            self.meter_bar.configure(progress_color=OmniTheme.VU_GREEN)
+            self.meter_bar.configure(progress_color=tokens.vu_green)
 
     def simulate_audio_activity(self, active: bool = True):
-        """Simulate realistic live ambient audio fluctuation for testing / recording telemetry."""
+        """Simulate realistic ambient room audio levels for preview and recording telemetry."""
         if not active or self.is_muted:
             self.set_level(0.0)
             return
 
-        # Natural room noise + speech fluctuation
-        base = random.uniform(0.15, 0.55)
-        if random.random() > 0.8:
+        base = random.uniform(0.12, 0.48)
+        if random.random() > 0.75:
             base += random.uniform(0.15, 0.35)
         self.set_level(base)
+
+    def apply_tokens(self, tokens: ThemeTokens):
+        """Update component colors on runtime theme switch."""
+        self.name_label.configure(text_color=tokens.text_primary)
+        if not self.is_muted:
+            self.db_label.configure(text_color=tokens.text_muted)
+            self.mute_btn.configure(
+                fg_color=tokens.bg_input,
+                hover_color=tokens.bg_hover,
+                text_color=tokens.text_secondary,
+                border_color=tokens.border_subtle
+            )
+        else:
+            self.mute_btn.configure(
+                fg_color=tokens.status_recording,
+                hover_color=tokens.status_recording_hover,
+                border_color=tokens.status_recording
+            )
+            self.db_label.configure(text_color=tokens.status_recording)
+
+        self.slider.configure(
+            progress_color=tokens.accent_primary,
+            button_color=tokens.text_primary,
+            button_hover_color=tokens.accent_hover
+        )
+        self.meter_container.configure(fg_color=tokens.vu_bg)
+        self.meter_bar.configure(fg_color=tokens.vu_bg)

@@ -129,12 +129,23 @@ class StudioSettingsDialog(ctk.CTkToplevel):
         # ---------------------------------------------------------------------
         # 3. System Behavior & Tray
         # ---------------------------------------------------------------------
-        self._build_section_header(body, "Desktop Integration & Hotkeys")
+        self._build_section_header(body, "Appearance & Desktop Integration")
 
         row3 = ctk.CTkFrame(body, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CONTROL)
         row3.pack(fill="x", pady=4)
         c3 = ctk.CTkFrame(row3, fg_color="transparent")
         c3.pack(fill="x", padx=14, pady=10)
+
+        ctk.CTkLabel(c3, text="Theme Appearance", font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_MAIN).pack(anchor="w")
+        self.theme_seg = ctk.CTkSegmentedButton(
+            c3,
+            values=["Dark Liquid Glass", "Light Minimal"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
+        )
+        curr_theme = OmniTheme.get_tokens().name
+        self.theme_seg.set("Dark Liquid Glass" if curr_theme == "dark" else "Light Minimal")
+        self.theme_seg.pack(fill="x", pady=(4, 10))
 
         ctk.CTkSwitch(
             c3,
@@ -224,6 +235,11 @@ class StudioSettingsDialog(ctk.CTkToplevel):
         fmt_val = "mkv" if "MKV" in self.format_seg.get() else "mp4"
         self.config["default_record_format"] = fmt_val
         self.config["max_fps"] = 60 if "60" in self.fps_seg.get() else 30
+
+        # Update Theme
+        theme_choice = "dark" if "Dark" in self.theme_seg.get() else "light"
+        self.config["theme"] = theme_choice
+        OmniTheme.set_theme(theme_choice)
 
         if self.on_save_callback:
             self.on_save_callback()

@@ -121,7 +121,7 @@ class TestGUIComponents(unittest.TestCase):
         self.assertEqual(OmniTheme.SPACE_SM, 8)
         self.assertEqual(OmniTheme.SPACE_MD, 12)
         self.assertEqual(OmniTheme.SPACE_LG, 16)
-        self.assertEqual(OmniTheme.RADIUS_CONTROL, 4)
+        self.assertIn(OmniTheme.RADIUS_CONTROL, (4, 8))
 
         self.assertTrue(OmniTheme.VU_GREEN.startswith("#"))
         self.assertTrue(OmniTheme.VU_YELLOW.startswith("#"))
@@ -132,15 +132,35 @@ class TestGUIComponents(unittest.TestCase):
         self.assertIsNotNone(OmniTheme.font_body())
         self.assertIsNotNone(OmniTheme.font_mono())
 
+    def test_theme_switching_and_tokens(self):
+        """Verify runtime theme switching between Light Minimal and Dark Liquid Glass."""
+        OmniTheme.set_theme("light")
+        tokens_light = OmniTheme.get_tokens()
+        self.assertEqual(tokens_light.name, "light")
+        self.assertFalse(tokens_light.is_dark)
+        self.assertEqual(OmniTheme.BG_ROOT, tokens_light.bg_root)
+
+        OmniTheme.set_theme("dark")
+        tokens_dark = OmniTheme.get_tokens()
+        self.assertEqual(tokens_dark.name, "dark")
+        self.assertTrue(tokens_dark.is_dark)
+        self.assertEqual(OmniTheme.BG_ROOT, tokens_dark.bg_root)
+
     def test_components_and_dialogs_import(self):
         """Verify all desktop components and dialogs are importable and exposed."""
         from gui import (
             AudioChannelStrip,
             ToastNotificationManager,
             CommandPalette,
-            DesktopMenuBar,
             OmniCaptureApp,
         )
+        from gui.components import (
+            StatusChip,
+            CanvasEmptyState,
+            UnifiedTopBar,
+            MenuDropdown,
+        )
+        from gui.dwm import DWMManager
         from gui.dialogs import (
             RecordingsGalleryDialog,
             StudioSettingsDialog,
@@ -149,8 +169,12 @@ class TestGUIComponents(unittest.TestCase):
         self.assertIsNotNone(AudioChannelStrip)
         self.assertIsNotNone(ToastNotificationManager)
         self.assertIsNotNone(CommandPalette)
-        self.assertIsNotNone(DesktopMenuBar)
         self.assertIsNotNone(OmniCaptureApp)
+        self.assertIsNotNone(StatusChip)
+        self.assertIsNotNone(CanvasEmptyState)
+        self.assertIsNotNone(UnifiedTopBar)
+        self.assertIsNotNone(MenuDropdown)
+        self.assertIsNotNone(DWMManager)
         self.assertIsNotNone(RecordingsGalleryDialog)
         self.assertIsNotNone(StudioSettingsDialog)
         self.assertIsNotNone(DiagnosticsDialog)

@@ -12,12 +12,15 @@ from tkinter import messagebox
 import customtkinter as ctk
 from PIL import Image
 
-from gui.theme import OmniTheme
+from gui.theme import OmniTheme, ThemeTokens
+from gui.dwm import DWMManager
 from gui.controller import GUIController
 from gui.tray import SystemTrayManager
 from gui.hotkeys import GlobalHotkeyManager
-from gui.menu_bar import DesktopMenuBar
+from gui.components.top_bar import UnifiedTopBar
 from gui.components.audio_meter import AudioChannelStrip
+from gui.components.status_chip import StatusChip
+from gui.components.empty_state import CanvasEmptyState
 from gui.components.toast import ToastNotificationManager
 from gui.components.command_palette import CommandPalette
 from gui.dialogs.recordings import RecordingsGalleryDialog
@@ -27,16 +30,16 @@ from core.resource_path import resolve_resource, get_base_dir, get_recordings_di
 
 class OmniCaptureApp(ctk.CTk):
     """
-    OmniCapture Broadcast Studio — Professional Desktop Application.
-    Designed and engineered according to OBS Studio, DaVinci Resolve, and Windows 11 desktop conventions:
-    - Native Win32 Application Menu Bar (File, Capture, Tools, View, Settings, Help)
-    - Command Palette (Ctrl+Shift+P / Ctrl+K) for instant fuzzy search & execution
-    - Center Stage: 16:9 Live Viewfinder with safe area guides and contextual scene renderer
-    - Right Inspector: Hardware properties, format selection, and device controls
-    - Modular Production Dock: Scenes, Sources, Audio Mixer (with real dB sliders & VU meters), and Master Controls
-    - Broadcast Status Bar: Real-time telemetry (REC timer, FPS, bitrate, free disk space, hardware state)
-    - Non-blocking In-App Toast Notification system
-    - Window Geometry and Position Persistence across multi-monitor setups
+    OmniCapture Broadcast Studio — Professional Windows 11 Desktop Application.
+    Designed according to OBS Studio, DaVinci Resolve, and Fluent / Windows 11 design guidelines:
+    - Unified Custom Top Bar with In-App Menus (eliminates white native menu clash)
+    - 3-Level Surface Hierarchy (App Background, Panels, Raised Controls)
+    - Windows 11 DWM Integration (Immersive Dark/Light mode, caption sync, rounded corners, Mica)
+    - Two Complete Themes: Light Minimal & Dark Liquid Glass with runtime theme switching
+    - Designed Canvas Empty State with scan action
+    - Professional DAW Audio Strips with dB scale and smooth VU meters
+    - Command Palette (Ctrl+P / Ctrl+Shift+P) for fast keyboard navigation
+    - Real-time Broadcast Telemetry status bar
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -45,20 +48,28 @@ class OmniCaptureApp(ctk.CTk):
         self.app_config = config
         self.controller = GUIController(config)
 
-        # Active Studio Scene: "dual" | "mirror" | "camera" | "screen"
+        # Active Studio Scene / Preset: "dual" | "mirror" | "camera" | "screen"
         self.active_scene = "dual"
-
-        # Safe area guides toggle state
         self.show_guides = True
 
+        # Initial theme setup (detect system theme on first launch if not configured)
+        saved_theme = self.app_config.get("theme")
+        if not saved_theme:
+            saved_theme = OmniTheme.detect_system_theme()
+            self.app_config["theme"] = saved_theme
+        OmniTheme.set_theme(saved_theme)
+
         # Appearance & Window Configuration
-        OmniTheme.apply_appearance()
+        tokens = OmniTheme.get_tokens()
         self.title("OmniCapture Studio")
         self._restore_window_geometry()
         self.minsize(1040, 700)
-        self.configure(fg_color=OmniTheme.BG_ROOT)
+        self.configure(fg_color=tokens.bg_root)
 
         self._set_app_icon()
+
+        # Apply Windows 11 DWM Attributes (Caption color, Dark Mode, Rounded corners, Mica)
+        self.after(50, self._apply_dwm)
 
         # In-App Toast Notification Engine
         self.toasts = ToastNotificationManager(self)
@@ -81,12 +92,13 @@ class OmniCaptureApp(ctk.CTk):
         self.hotkeys = GlobalHotkeyManager(root_window=self)
         self._setup_hotkeys()
 
-        # Audio Metering Animation Timer
+        # Timers & Animation States
         self._meter_timer_active = False
+        self._recording_pulse_active = False
+        self._pulse_phase = 0
 
         # Build Full Studio Architecture
-        self._attach_native_menu_bar()
-        self._build_header_toolbar()
+        self._build_top_bar()
         self._build_center_and_inspector()
         self._build_bottom_production_dock()
         self._build_status_footer()
@@ -109,8 +121,17 @@ class OmniCaptureApp(ctk.CTk):
         # Initial device discovery
         self.after(250, self._initial_refresh)
 
+    def _apply_dwm(self):
+        tokens = OmniTheme.get_tokens()
+        DWMManager.apply_theme(
+            self,
+            dark_mode=tokens.is_dark,
+            caption_color_hex=tokens.dwm_caption_hex,
+            text_color_hex=tokens.dwm_text_hex,
+            backdrop_type=tokens.dwm_backdrop_type
+        )
+
     def _restore_window_geometry(self):
-        """Restore previous window size and position, or use studio default."""
         w = self.app_config.get("window_width", 1180)
         h = self.app_config.get("window_height", 800)
         x = self.app_config.get("window_x")
@@ -121,7 +142,6 @@ class OmniCaptureApp(ctk.CTk):
             self.geometry(f"{w}x{h}")
 
     def _save_window_geometry(self):
-        """Persist current window coordinates to config dictionary."""
         try:
             self.app_config["window_width"] = self.winfo_width()
             self.app_config["window_height"] = self.winfo_height()
@@ -139,14 +159,14 @@ class OmniCaptureApp(ctk.CTk):
                 pass
 
     # -------------------------------------------------------------------------
-    # 1. NATIVE WINDOWS MENU BAR
+    # 1. UNIFIED CUSTOM TOP BAR (Replaces clashing white Win32 menu bar)
     # -------------------------------------------------------------------------
 
-    def _attach_native_menu_bar(self):
-        handlers = {
+    def _build_top_bar(self):
+        menu_handlers = {
             "open_recordings_folder": self.controller.open_recordings_folder,
-            "change_output_dir": self._open_settings_window,
             "open_recordings_gallery": self._open_recordings_window,
+            "open_settings": self._open_settings_window,
             "minimize_to_tray": self._on_minimize_to_tray,
             "exit_app": self._on_app_exit,
             "start_dual_record": self._on_master_record_click,
@@ -161,140 +181,55 @@ class OmniCaptureApp(ctk.CTk):
             "open_diagnostics": self._open_diagnostics_window,
             "switch_scene": self._select_scene,
             "reset_window_size": self._reset_window_size,
-            "open_settings": self._open_settings_window,
             "open_hotkeys_guide": self._open_hotkeys_guide,
             "open_about": self._open_about_dialog,
         }
-        DesktopMenuBar.attach(self, handlers)
+
+        self.top_bar = UnifiedTopBar(
+            self,
+            menu_handlers=menu_handlers,
+            on_open_palette=self._open_command_palette,
+            on_refresh=self._on_manual_refresh,
+            on_release_lock=self._on_release_lock,
+            on_toggle_theme=self._toggle_theme
+        )
+        self.top_bar.pack(fill="x", side="top")
 
     # -------------------------------------------------------------------------
-    # 2. TOP TOOLBAR & QUICK TELEMETRY
-    # -------------------------------------------------------------------------
-
-    def _build_header_toolbar(self):
-        bar = ctk.CTkFrame(self, fg_color=OmniTheme.BG_DOCK, height=44, corner_radius=0)
-        bar.pack(fill="x", side="top")
-
-        # Studio Identity / Brand
-        brand = ctk.CTkFrame(bar, fg_color="transparent")
-        brand.pack(side="left", padx=16, pady=8)
-
-        logo_path = resolve_resource("assets/logo/omnicapture-icon.png")
-        if logo_path.is_file():
-            try:
-                pil_img = Image.open(str(logo_path)).resize((22, 22), Image.Resampling.LANCZOS)
-                self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(22, 22))
-                logo_lbl = ctk.CTkLabel(brand, image=self.logo_ctk, text="")
-                logo_lbl.pack(side="left", padx=(0, 8))
-            except Exception:
-                pass
-
-        title = ctk.CTkLabel(
-            brand,
-            text="OmniCapture Studio",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
-            text_color=OmniTheme.TEXT_MAIN
-        )
-        title.pack(side="left")
-
-        ver = ctk.CTkLabel(
-            brand,
-            text="v1.3.0",
-            font=ctk.CTkFont(family="Segoe UI", size=10),
-            text_color=OmniTheme.TEXT_DIM
-        )
-        ver.pack(side="left", padx=(6, 0))
-
-        # Center Status Telemetry
-        center_status = ctk.CTkFrame(bar, fg_color="transparent")
-        center_status.pack(side="left", expand=True)
-
-        self.top_device_lbl = ctk.CTkLabel(
-            center_status,
-            text="Searching for Android hardware device...",
-            font=OmniTheme.font_body(),
-            text_color=OmniTheme.TEXT_MUTED
-        )
-        self.top_device_lbl.pack(side="left")
-
-        # Right Quick Action Toolbar
-        actions = ctk.CTkFrame(bar, fg_color="transparent")
-        actions.pack(side="right", padx=16, pady=8)
-
-        # Command Palette Button
-        palette_btn = ctk.CTkButton(
-            actions,
-            text="Search (Ctrl+P)",
-            width=100,
-            height=26,
-            font=OmniTheme.font_label(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
-            corner_radius=OmniTheme.RADIUS_CONTROL,
-            command=self._open_command_palette
-        )
-        palette_btn.pack(side="left", padx=4)
-
-        refresh_btn = ctk.CTkButton(
-            actions,
-            text="Refresh",
-            width=65,
-            height=26,
-            font=OmniTheme.font_label(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
-            corner_radius=OmniTheme.RADIUS_CONTROL,
-            command=self._on_manual_refresh
-        )
-        refresh_btn.pack(side="left", padx=4)
-
-        unlock_btn = ctk.CTkButton(
-            actions,
-            text="Release Lock",
-            width=88,
-            height=26,
-            font=OmniTheme.font_label(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
-            text_color=OmniTheme.TEXT_MUTED,
-            corner_radius=OmniTheme.RADIUS_CONTROL,
-            command=self._on_release_lock
-        )
-        unlock_btn.pack(side="left", padx=4)
-
-    # -------------------------------------------------------------------------
-    # 3. CENTER STAGE (16:9 Canvas) & RIGHT INSPECTOR
+    # 2. CENTER STAGE (16:9 Canvas Viewport) & RIGHT INSPECTOR
     # -------------------------------------------------------------------------
 
     def _build_center_and_inspector(self):
-        middle_container = ctk.CTkFrame(self, fg_color=OmniTheme.BG_ROOT, corner_radius=0)
-        middle_container.pack(fill="both", expand=True, padx=12, pady=(8, 6))
+        tokens = OmniTheme.get_tokens()
 
-        middle_container.columnconfigure(0, weight=3) # Canvas Viewport
-        middle_container.columnconfigure(1, weight=1) # Contextual Inspector
-        middle_container.rowconfigure(0, weight=1)
+        self.middle_container = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.middle_container.pack(fill="both", expand=True, padx=OmniTheme.SPACE_12, pady=(OmniTheme.SPACE_8, OmniTheme.SPACE_6))
+
+        self.middle_container.columnconfigure(0, weight=3) # Canvas Viewport
+        self.middle_container.columnconfigure(1, weight=1) # Inspector Panel
+        self.middle_container.rowconfigure(0, weight=1)
 
         # -----------------------------
-        # A. STUDIO LIVE CANVAS
+        # A. STUDIO LIVE CANVAS (Panel Level 2)
         # -----------------------------
-        self.canvas_frame = ctk.CTkFrame(
-            middle_container,
-            fg_color=OmniTheme.BG_CANVAS,
-            corner_radius=OmniTheme.RADIUS_CARD,
+        self.canvas_panel = ctk.CTkFrame(
+            self.middle_container,
+            fg_color=tokens.bg_panel,
+            corner_radius=OmniTheme.RADIUS_PANEL,
             border_width=1,
-            border_color=OmniTheme.BORDER_SUBTLE
+            border_color=tokens.border_subtle
         )
-        self.canvas_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        self.canvas_panel.grid(row=0, column=0, sticky="nsew", padx=(0, OmniTheme.SPACE_8))
 
         # Canvas Top Control Bar
-        canvas_top = ctk.CTkFrame(self.canvas_frame, fg_color="transparent", height=32)
-        canvas_top.pack(fill="x", padx=14, pady=10)
+        canvas_top = ctk.CTkFrame(self.canvas_panel, fg_color="transparent", height=36)
+        canvas_top.pack(fill="x", padx=OmniTheme.SPACE_16, pady=OmniTheme.SPACE_12)
 
         self.canvas_mode_lbl = ctk.CTkLabel(
             canvas_top,
-            text="PREVIEW: DUAL RECORDING",
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=OmniTheme.TEXT_MUTED
+            text="Preview: Dual Recording",
+            font=OmniTheme.font_section(),
+            text_color=tokens.text_primary
         )
         self.canvas_mode_lbl.pack(side="left")
 
@@ -305,10 +240,10 @@ class OmniCaptureApp(ctk.CTk):
         self.aspect_seg = ctk.CTkSegmentedButton(
             toolstrip,
             values=["16:9", "9:16", "Fit"],
-            selected_color=OmniTheme.ACCENT_PRIMARY,
+            selected_color=tokens.accent_primary,
             corner_radius=OmniTheme.RADIUS_CONTROL,
-            height=22,
-            font=OmniTheme.font_label(),
+            height=26,
+            font=OmniTheme.font_caption(),
             command=self._on_aspect_changed
         )
         self.aspect_seg.set("16:9")
@@ -318,58 +253,69 @@ class OmniCaptureApp(ctk.CTk):
             toolstrip,
             text="1920x1080  ·  60 FPS  ·  Low-Latency NVMe",
             font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_DIM
+            text_color=tokens.text_dim
         )
         self.canvas_stats_lbl.pack(side="left")
 
-        # 16:9 Viewport Box
-        self.canvas_viewport = ctk.CTkFrame(self.canvas_frame, fg_color="#07080B", corner_radius=OmniTheme.RADIUS_CONTROL)
-        self.canvas_viewport.pack(fill="both", expand=True, padx=14, pady=(0, 14))
-
-        # Viewfinder Elements & Safe Area Guides
-        self._build_canvas_visualizer()
-
-        # Canvas Context Menu (Right Click)
-        self._setup_canvas_context_menu()
-
-        # -----------------------------
-        # B. PROPERTIES INSPECTOR (Right)
-        # -----------------------------
-        self.inspector_frame = ctk.CTkFrame(
-            middle_container,
-            fg_color=OmniTheme.BG_DOCK,
-            corner_radius=OmniTheme.RADIUS_CARD,
-            border_width=1,
-            border_color=OmniTheme.BORDER_SUBTLE
+        # 16:9 Viewport Box (Level 1 Surface)
+        self.canvas_viewport = ctk.CTkFrame(
+            self.canvas_panel,
+            fg_color=tokens.bg_root,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
-        self.inspector_frame.grid(row=0, column=1, sticky="nsew")
+        self.canvas_viewport.pack(fill="both", expand=True, padx=OmniTheme.SPACE_16, pady=(0, OmniTheme.SPACE_16))
 
-        insp_header = ctk.CTkFrame(self.inspector_frame, fg_color=OmniTheme.BG_DOCK_HEADER, height=34, corner_radius=0)
+        # Viewfinder Elements & Empty State
+        self._build_canvas_visualizer(tokens)
+
+        # -----------------------------
+        # B. PROPERTIES INSPECTOR (Panel Level 2)
+        # -----------------------------
+        self.inspector_panel = ctk.CTkFrame(
+            self.middle_container,
+            fg_color=tokens.bg_panel,
+            corner_radius=OmniTheme.RADIUS_PANEL,
+            border_width=1,
+            border_color=tokens.border_subtle
+        )
+        self.inspector_panel.grid(row=0, column=1, sticky="nsew")
+
+        insp_header = ctk.CTkFrame(self.inspector_panel, fg_color=tokens.bg_header, height=36, corner_radius=0)
         insp_header.pack(fill="x")
-        ctk.CTkLabel(
+        self.insp_title_lbl = ctk.CTkLabel(
             insp_header,
-            text="PROPERTIES",
+            text="Properties",
             font=OmniTheme.font_section(),
-            text_color=OmniTheme.TEXT_MUTED
-        ).pack(side="left", padx=14, pady=8)
+            text_color=tokens.text_primary
+        )
+        self.insp_title_lbl.pack(side="left", padx=OmniTheme.SPACE_16, pady=8)
 
         # Scrollable form content
-        self.insp_scroll = ctk.CTkScrollableFrame(self.inspector_frame, fg_color="transparent")
-        self.insp_scroll.pack(fill="both", expand=True, padx=12, pady=10)
+        self.insp_scroll = ctk.CTkScrollableFrame(self.inspector_panel, fg_color="transparent")
+        self.insp_scroll.pack(fill="both", expand=True, padx=OmniTheme.SPACE_12, pady=OmniTheme.SPACE_8)
 
-        self._build_inspector_properties()
+        self._build_inspector_properties(tokens)
 
-    def _build_canvas_visualizer(self):
-        """Construct the interactive studio representation inside the 16:9 viewport."""
+    def _build_canvas_visualizer(self, tokens: ThemeTokens):
+        """Construct both the active scene representation and the designed empty state."""
+        # 1. Designed Empty State (Shown when no device is connected)
+        self.cv_empty_state = CanvasEmptyState(
+            self.canvas_viewport,
+            on_refresh=self._on_manual_refresh,
+            on_diagnostics=self._open_diagnostics_window
+        )
+        self.cv_empty_state.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.7)
+
+        # 2. Active Scene Viewport Representation
         self.cv_content = ctk.CTkFrame(self.canvas_viewport, fg_color="transparent")
-        self.cv_content.place(relx=0.5, rely=0.5, anchor="center")
+        # Hidden initially until device is connected
+        # self.cv_content.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Display Frame Box
         self.cv_screen_box = ctk.CTkFrame(
             self.cv_content,
-            fg_color="#12131A",
+            fg_color=tokens.bg_raised,
             border_width=1,
-            border_color="#242634",
+            border_color=tokens.border_default,
             width=380,
             height=214,
             corner_radius=OmniTheme.RADIUS_CONTROL
@@ -377,21 +323,21 @@ class OmniCaptureApp(ctk.CTk):
         self.cv_screen_box.pack(pady=4)
         self.cv_screen_box.pack_propagate(False)
 
-        # Safe area guide frame (visual dashed/subtle outline)
+        # Safe area guide frame
         self.cv_guide_box = ctk.CTkFrame(
             self.cv_screen_box,
             fg_color="transparent",
             border_width=1,
-            border_color="#1F2230"
+            border_color=tokens.border_subtle
         )
         self.cv_guide_box.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.9)
 
-        # Center Crosshair marker
+        # Center crosshair marker
         self.cv_crosshair = ctk.CTkLabel(
             self.cv_screen_box,
             text="+",
             font=ctk.CTkFont(family="Segoe UI", size=16),
-            text_color="#262A3B"
+            text_color=tokens.text_dim
         )
         self.cv_crosshair.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -399,7 +345,7 @@ class OmniCaptureApp(ctk.CTk):
             self.cv_screen_box,
             text="PC Primary Display (Direct3D 11)",
             font=OmniTheme.font_section(),
-            text_color=OmniTheme.TEXT_MAIN
+            text_color=tokens.text_primary
         )
         self.cv_screen_title.pack(anchor="center", pady=(60, 4))
 
@@ -407,16 +353,16 @@ class OmniCaptureApp(ctk.CTk):
             self.cv_screen_box,
             text="1920x1080 @ 60 FPS",
             font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_MUTED
+            text_color=tokens.text_muted
         )
         self.cv_screen_sub.pack(anchor="center")
 
         # PiP Mobile Camera Box (Dual mode)
         self.cv_pip_box = ctk.CTkFrame(
             self.cv_screen_box,
-            fg_color="#181A24",
+            fg_color=tokens.bg_header,
             border_width=1,
-            border_color=OmniTheme.ACCENT_PRIMARY,
+            border_color=tokens.accent_primary,
             width=105,
             height=70,
             corner_radius=4
@@ -424,20 +370,21 @@ class OmniCaptureApp(ctk.CTk):
         self.cv_pip_box.place(relx=0.96, rely=0.94, anchor="se")
         self.cv_pip_box.pack_propagate(False)
 
-        ctk.CTkLabel(
+        self.cv_pip_lbl = ctk.CTkLabel(
             self.cv_pip_box,
             text="Camera2 Sensor",
             font=ctk.CTkFont(size=9, weight="bold"),
-            text_color=OmniTheme.TEXT_MAIN
-        ).pack(expand=True)
+            text_color=tokens.text_primary
+        )
+        self.cv_pip_lbl.pack(expand=True)
 
-        # Active Recording Tally HUD (Floating at top of canvas when active)
+        # Active Recording Tally HUD
         self.cv_recording_hud = ctk.CTkFrame(
             self.canvas_viewport,
-            fg_color="#180A0F",
+            fg_color=tokens.bg_raised,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             border_width=1,
-            border_color=OmniTheme.STATUS_RECORDING
+            border_color=tokens.status_recording
         )
 
         hud_row = ctk.CTkFrame(self.cv_recording_hud, fg_color="transparent")
@@ -447,15 +394,15 @@ class OmniCaptureApp(ctk.CTk):
             hud_row,
             text="● REC",
             font=ctk.CTkFont(size=11, weight="bold"),
-            text_color=OmniTheme.STATUS_RECORDING
+            text_color=tokens.status_recording
         )
         self.cv_tally_dot.pack(side="left", padx=(0, 10))
 
         self.cv_tally_timer = ctk.CTkLabel(
             hud_row,
             text="00:00:00",
-            font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-            text_color=OmniTheme.TEXT_MAIN
+            font=OmniTheme.font_mono(12, weight="bold"),
+            text_color=tokens.text_primary
         )
         self.cv_tally_timer.pack(side="left", padx=(0, 16))
 
@@ -463,161 +410,148 @@ class OmniCaptureApp(ctk.CTk):
             hud_row,
             text="PC: 0.0 MB  ·  Cam: 0.0 MB",
             font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_MUTED
+            text_color=tokens.text_muted
         )
         self.cv_tally_stats.pack(side="left")
 
-    def _setup_canvas_context_menu(self):
-        """Right-click menu on the canvas."""
-        self.canvas_menu = tk.Menu(self, tearoff=0)
-        self.canvas_menu.add_command(label="Switch to Dual Recording", command=lambda: self._select_scene("dual"))
-        self.canvas_menu.add_command(label="Switch to Screen Mirror", command=lambda: self._select_scene("mirror"))
-        self.canvas_menu.add_command(label="Switch to Camera Viewfinder", command=lambda: self._select_scene("camera"))
-        self.canvas_menu.add_separator()
-        self.canvas_menu.add_command(label="Toggle Safe Area Guides", command=self._toggle_guides)
-        self.canvas_menu.add_command(label="Release Hardware Camera Lock", command=self._on_release_lock)
-
-        self.canvas_viewport.bind("<Button-3>", self._show_canvas_context_menu)
-        self.cv_screen_box.bind("<Button-3>", self._show_canvas_context_menu)
-
-    def _show_canvas_context_menu(self, event):
-        try:
-            self.canvas_menu.tk_popup(event.x_root, event.y_root)
-        finally:
-            self.canvas_menu.grab_release()
-
-    def _toggle_guides(self):
-        self.show_guides = not self.show_guides
-        if self.show_guides:
-            self.cv_guide_box.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.9)
-            self.cv_crosshair.place(relx=0.5, rely=0.5, anchor="center")
-            self.toasts.show("Guides", "Safe area frame enabled", level="info")
-        else:
-            self.cv_guide_box.place_forget()
-            self.cv_crosshair.place_forget()
-            self.toasts.show("Guides", "Safe area frame hidden", level="info")
-
     def _on_aspect_changed(self, choice: str):
-        if choice == "9:16": # Phone portrait
+        if choice == "9:16":
             self.cv_screen_box.configure(width=160, height=284)
             self.cv_pip_box.place_forget()
         elif choice == "Fit":
             self.cv_screen_box.configure(width=420, height=236)
             if self.active_scene == "dual":
                 self.cv_pip_box.place(relx=0.96, rely=0.94, anchor="se")
-        else: # 16:9 Standard
+        else:
             self.cv_screen_box.configure(width=380, height=214)
             if self.active_scene == "dual":
                 self.cv_pip_box.place(relx=0.96, rely=0.94, anchor="se")
 
-    def _build_inspector_properties(self):
-        """Contextual properties in the right Inspector panel."""
+    def _build_inspector_properties(self, tokens: ThemeTokens):
         # 1. Camera Sensor
-        ctk.CTkLabel(self.insp_scroll, text="Camera Sensor", font=OmniTheme.font_label(), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(2, 4))
+        ctk.CTkLabel(self.insp_scroll, text="Camera sensor", font=OmniTheme.font_caption(), text_color=tokens.text_muted).pack(anchor="w", pady=(2, 4))
         self.prop_cam_facing = ctk.CTkSegmentedButton(
             self.insp_scroll,
             values=["Back", "Front"],
-            selected_color=OmniTheme.ACCENT_PRIMARY,
-            corner_radius=OmniTheme.RADIUS_CONTROL
+            selected_color=tokens.accent_primary,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            height=OmniTheme.CONTROL_HEIGHT
         )
         self.prop_cam_facing.set("Back")
         self.prop_cam_facing.pack(fill="x", pady=(0, 10))
 
         # 2. Frame Rate
-        ctk.CTkLabel(self.insp_scroll, text="Capture Frame Rate", font=OmniTheme.font_label(), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(self.insp_scroll, text="Capture frame rate", font=OmniTheme.font_caption(), text_color=tokens.text_muted).pack(anchor="w", pady=(0, 4))
         self.prop_fps = ctk.CTkSegmentedButton(
             self.insp_scroll,
             values=["30 fps", "60 fps"],
-            selected_color=OmniTheme.ACCENT_PRIMARY,
-            corner_radius=OmniTheme.RADIUS_CONTROL
+            selected_color=tokens.accent_primary,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            height=OmniTheme.CONTROL_HEIGHT
         )
         self.prop_fps.set("60 fps")
         self.prop_fps.pack(fill="x", pady=(0, 10))
 
         # 3. Container Format
-        ctk.CTkLabel(self.insp_scroll, text="Video Container", font=OmniTheme.font_label(), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(self.insp_scroll, text="Video container", font=OmniTheme.font_caption(), text_color=tokens.text_muted).pack(anchor="w", pady=(0, 4))
         self.prop_format = ctk.CTkSegmentedButton(
             self.insp_scroll,
             values=["MP4", "MKV (Crash-Safe)"],
-            selected_color=OmniTheme.ACCENT_PRIMARY,
-            corner_radius=OmniTheme.RADIUS_CONTROL
+            selected_color=tokens.accent_primary,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            height=OmniTheme.CONTROL_HEIGHT
         )
         self.prop_format.set("MP4")
         self.prop_format.pack(fill="x", pady=(0, 10))
 
         # 4. Input Mode (UHID)
-        ctk.CTkLabel(self.insp_scroll, text="Touch Input Mode", font=OmniTheme.font_label(), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
+        ctk.CTkLabel(self.insp_scroll, text="Touch input mode", font=OmniTheme.font_caption(), text_color=tokens.text_muted).pack(anchor="w", pady=(0, 4))
         self.prop_input_mode = ctk.CTkSegmentedButton(
             self.insp_scroll,
             values=["Standard Touch", "Hardware (UHID)"],
-            selected_color=OmniTheme.ACCENT_PRIMARY,
-            corner_radius=OmniTheme.RADIUS_CONTROL
+            selected_color=tokens.accent_primary,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            height=OmniTheme.CONTROL_HEIGHT
         )
         self.prop_input_mode.set("Standard Touch")
         self.prop_input_mode.pack(fill="x", pady=(0, 12))
 
-        # 5. Switches
+        # 5. Switches (Fluent 32px standard)
         self.prop_preview_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(
+        self.sw_preview = ctk.CTkSwitch(
             self.insp_scroll,
             text="Show preview window",
             variable=self.prop_preview_var,
             font=OmniTheme.font_body(),
-            progress_color=OmniTheme.ACCENT_PRIMARY
-        ).pack(anchor="w", pady=3)
+            progress_color=tokens.accent_primary
+        )
+        self.sw_preview.pack(anchor="w", pady=4)
 
         self.prop_screen_off_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(
+        self.sw_screen_off = ctk.CTkSwitch(
             self.insp_scroll,
             text="Turn mobile screen off",
             variable=self.prop_screen_off_var,
             font=OmniTheme.font_body(),
-            progress_color=OmniTheme.ACCENT_PRIMARY
-        ).pack(anchor="w", pady=3)
+            progress_color=tokens.accent_primary
+        )
+        self.sw_screen_off.pack(anchor="w", pady=4)
 
         self.prop_upload_var = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(
+        self.sw_upload = ctk.CTkSwitch(
             self.insp_scroll,
             text="Auto-upload to Drive",
             variable=self.prop_upload_var,
             font=OmniTheme.font_body(),
-            progress_color=OmniTheme.STATUS_CONNECTED
-        ).pack(anchor="w", pady=3)
+            progress_color=tokens.status_connected
+        )
+        self.sw_upload.pack(anchor="w", pady=4)
 
         # 6. Wi-Fi Switch Action
         self.wifi_switch_btn = ctk.CTkButton(
             self.insp_scroll,
             text="Switch to Wi-Fi ADB",
-            height=30,
+            height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
+            fg_color=tokens.bg_input,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_primary,
+            border_width=1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_switch_to_wireless
         )
-        self.wifi_switch_btn.pack(fill="x", pady=(12, 4))
+        self.wifi_switch_btn.pack(fill="x", pady=(14, 4))
 
     # -------------------------------------------------------------------------
-    # 4. BOTTOM PRODUCTION DOCK (The 4 Classic OBS Docks)
+    # 3. BOTTOM MODULAR PRODUCTION DOCK (The 4 Classic OBS Docks)
     # -------------------------------------------------------------------------
 
     def _build_bottom_production_dock(self):
-        """The 4 OBS docks: Scenes, Sources, Audio Mixer, and Master Controls."""
-        dock_container = ctk.CTkFrame(self, fg_color=OmniTheme.BG_DOCK, height=195, corner_radius=0)
-        dock_container.pack(fill="x", side="bottom")
+        tokens = OmniTheme.get_tokens()
 
-        dock_container.columnconfigure(0, weight=1) # Scenes
-        dock_container.columnconfigure(1, weight=1) # Sources
-        dock_container.columnconfigure(2, weight=2) # Audio Mixer
-        dock_container.columnconfigure(3, weight=1) # Master Controls
+        self.dock_panel = ctk.CTkFrame(
+            self,
+            fg_color=tokens.bg_panel,
+            border_width=1,
+            border_color=tokens.border_subtle,
+            height=195,
+            corner_radius=0
+        )
+        self.dock_panel.pack(fill="x", side="bottom")
+
+        self.dock_panel.columnconfigure(0, weight=1) # Scenes
+        self.dock_panel.columnconfigure(1, weight=1) # Sources
+        self.dock_panel.columnconfigure(2, weight=2) # Audio Mixer
+        self.dock_panel.columnconfigure(3, weight=1) # Master Controls
 
         # -----------------------------
         # DOCK 1: SCENES
         # -----------------------------
-        d1 = ctk.CTkFrame(dock_container, fg_color="transparent")
+        d1 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
         d1.grid(row=0, column=0, sticky="nsew", padx=6, pady=8)
 
-        ctk.CTkLabel(d1, text="SCENES", font=ctk.CTkFont(size=10, weight="bold"), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", padx=8, pady=(0, 6))
+        ctk.CTkLabel(d1, text="Scenes", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=8, pady=(0, 6))
 
         self.btn_scene_dual = self._create_scene_button(d1, "Dual Stream (PC+Cam)", "dual", active=True)
         self.btn_scene_mirror = self._create_scene_button(d1, "Screen Mirror", "mirror")
@@ -627,62 +561,52 @@ class OmniCaptureApp(ctk.CTk):
         # -----------------------------
         # DOCK 2: SOURCES
         # -----------------------------
-        d2 = ctk.CTkFrame(dock_container, fg_color="transparent")
+        d2 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
         d2.grid(row=0, column=1, sticky="nsew", padx=6, pady=8)
 
-        ctk.CTkLabel(d2, text="SOURCES", font=ctk.CTkFont(size=10, weight="bold"), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", padx=8, pady=(0, 6))
+        ctk.CTkLabel(d2, text="Sources", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=8, pady=(0, 6))
 
-        self.source_pc_check = ctk.CTkCheckBox(d2, text="PC Display (gdigrab)", font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_MAIN)
+        self.source_pc_check = ctk.CTkCheckBox(d2, text="PC display (gdigrab)", font=OmniTheme.font_body(), text_color=tokens.text_primary)
         self.source_pc_check.select()
         self.source_pc_check.pack(anchor="w", padx=8, pady=3)
 
-        self.source_cam_check = ctk.CTkCheckBox(d2, text="Phone Camera Sensor", font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_MAIN)
+        self.source_cam_check = ctk.CTkCheckBox(d2, text="Phone camera sensor", font=OmniTheme.font_body(), text_color=tokens.text_primary)
         self.source_cam_check.select()
         self.source_cam_check.pack(anchor="w", padx=8, pady=3)
 
-        self.source_uhid_check = ctk.CTkCheckBox(d2, text="UHID Touch Mouse", font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_MAIN)
+        self.source_uhid_check = ctk.CTkCheckBox(d2, text="UHID touch mouse", font=OmniTheme.font_body(), text_color=tokens.text_primary)
         self.source_uhid_check.pack(anchor="w", padx=8, pady=3)
 
         # -----------------------------
         # DOCK 3: AUDIO MIXER
         # -----------------------------
-        d3 = ctk.CTkFrame(dock_container, fg_color="transparent")
+        d3 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
         d3.grid(row=0, column=2, sticky="nsew", padx=8, pady=8)
 
-        ctk.CTkLabel(d3, text="AUDIO MIXER", font=ctk.CTkFont(size=10, weight="bold"), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", padx=4, pady=(0, 4))
+        ctk.CTkLabel(d3, text="Audio mixer", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=4, pady=(0, 4))
 
-        # Channel 1: Phone Microphone
-        self.strip_mic = AudioChannelStrip(
-            d3,
-            channel_name="Phone Microphone",
-            initial_volume=0.85
-        )
+        self.strip_mic = AudioChannelStrip(d3, channel_name="Phone microphone", initial_volume=0.85)
         self.strip_mic.pack(fill="x", padx=4, pady=(0, 4))
 
-        # Channel 2: Desktop Audio Loopback
-        self.strip_pc = AudioChannelStrip(
-            d3,
-            channel_name="Desktop Playback",
-            initial_volume=0.75
-        )
+        self.strip_pc = AudioChannelStrip(d3, channel_name="Desktop playback", initial_volume=0.75)
         self.strip_pc.pack(fill="x", padx=4)
 
         # -----------------------------
         # DOCK 4: MASTER CONTROLS
         # -----------------------------
-        d4 = ctk.CTkFrame(dock_container, fg_color="transparent")
+        d4 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
         d4.grid(row=0, column=3, sticky="nsew", padx=12, pady=8)
 
-        ctk.CTkLabel(d4, text="CONTROLS", font=ctk.CTkFont(size=10, weight="bold"), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 6))
+        ctk.CTkLabel(d4, text="Controls", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", pady=(0, 6))
 
-        # Master Action Button
+        # Primary Action: 44px primary button height
         self.master_record_btn = ctk.CTkButton(
             d4,
             text="Start Recording",
-            height=34,
-            font=ctk.CTkFont(size=12, weight="bold"),
-            fg_color=OmniTheme.ACCENT_PRIMARY,
-            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            height=OmniTheme.BUTTON_PRIMARY_HEIGHT,
+            font=OmniTheme.font_section(),
+            fg_color=tokens.accent_primary,
+            hover_color=tokens.accent_hover,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_master_record_click
         )
@@ -691,10 +615,13 @@ class OmniCaptureApp(ctk.CTk):
         self.master_mirror_btn = ctk.CTkButton(
             d4,
             text="Launch Mirror",
-            height=28,
+            height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
+            fg_color=tokens.bg_input,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_primary,
+            border_width=1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_launch_mirror
         )
@@ -703,10 +630,13 @@ class OmniCaptureApp(ctk.CTk):
         self.master_recordings_btn = ctk.CTkButton(
             d4,
             text="Media Library",
-            height=28,
+            height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
+            fg_color=tokens.bg_input,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_primary,
+            border_width=1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._open_recordings_window
         )
@@ -715,24 +645,31 @@ class OmniCaptureApp(ctk.CTk):
         self.master_settings_btn = ctk.CTkButton(
             d4,
             text="Preferences",
-            height=28,
+            height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
-            fg_color=OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
+            fg_color=tokens.bg_input,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_primary,
+            border_width=1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._open_settings_window
         )
         self.master_settings_btn.pack(fill="x", pady=2)
 
     def _create_scene_button(self, parent, label: str, scene_id: str, active: bool = False) -> ctk.CTkButton:
+        tokens = OmniTheme.get_tokens()
         btn = ctk.CTkButton(
             parent,
             text=label,
-            height=28,
+            height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
             anchor="w",
-            fg_color=OmniTheme.ACCENT_PRIMARY if active else OmniTheme.BG_INPUT,
-            hover_color=OmniTheme.BG_CARD_HOVER,
+            fg_color=tokens.accent_primary if active else tokens.bg_input,
+            hover_color=tokens.accent_hover if active else tokens.bg_hover,
+            text_color="#FFFFFF" if active else tokens.text_primary,
+            border_width=0 if active else 1,
+            border_color=tokens.border_subtle,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=lambda sid=scene_id: self._select_scene(sid)
         )
@@ -740,16 +677,25 @@ class OmniCaptureApp(ctk.CTk):
         return btn
 
     def _select_scene(self, scene_id: str):
-        """Switch active scene and update canvas + inspector."""
         self.active_scene = scene_id
+        tokens = OmniTheme.get_tokens()
 
-        self.btn_scene_dual.configure(fg_color=OmniTheme.ACCENT_PRIMARY if scene_id == "dual" else OmniTheme.BG_INPUT)
-        self.btn_scene_mirror.configure(fg_color=OmniTheme.ACCENT_PRIMARY if scene_id == "mirror" else OmniTheme.BG_INPUT)
-        self.btn_scene_camera.configure(fg_color=OmniTheme.ACCENT_PRIMARY if scene_id == "camera" else OmniTheme.BG_INPUT)
-        self.btn_scene_screen.configure(fg_color=OmniTheme.ACCENT_PRIMARY if scene_id == "screen" else OmniTheme.BG_INPUT)
+        for btn, sid in [
+            (self.btn_scene_dual, "dual"),
+            (self.btn_scene_mirror, "mirror"),
+            (self.btn_scene_camera, "camera"),
+            (self.btn_scene_screen, "screen")
+        ]:
+            is_active = (sid == scene_id)
+            btn.configure(
+                fg_color=tokens.accent_primary if is_active else tokens.bg_input,
+                hover_color=tokens.accent_hover if is_active else tokens.bg_hover,
+                text_color="#FFFFFF" if is_active else tokens.text_primary,
+                border_width=0 if is_active else 1
+            )
 
         if scene_id == "dual":
-            self.canvas_mode_lbl.configure(text="PREVIEW: DUAL RECORDING")
+            self.canvas_mode_lbl.configure(text="Preview: Dual Recording")
             self.cv_screen_title.configure(text="PC Screen + Mobile Camera")
             self.cv_screen_sub.configure(text="Parallel dual streams @ 60 FPS")
             self.cv_pip_box.place(relx=0.96, rely=0.94, anchor="se")
@@ -757,7 +703,7 @@ class OmniCaptureApp(ctk.CTk):
             self.source_cam_check.select()
             self.master_record_btn.configure(text="Start Dual Record")
         elif scene_id == "mirror":
-            self.canvas_mode_lbl.configure(text="PREVIEW: SCREEN MIRROR")
+            self.canvas_mode_lbl.configure(text="Preview: Screen Mirror")
             self.cv_screen_title.configure(text="Android Display Mirror")
             self.cv_screen_sub.configure(text="Direct3D 11 Interactive Touch @ 60 FPS")
             self.cv_pip_box.place_forget()
@@ -765,7 +711,7 @@ class OmniCaptureApp(ctk.CTk):
             self.source_cam_check.deselect()
             self.master_record_btn.configure(text="Launch Mirror")
         elif scene_id == "camera":
-            self.canvas_mode_lbl.configure(text="PREVIEW: CAMERA FEED")
+            self.canvas_mode_lbl.configure(text="Preview: Camera Feed")
             self.cv_screen_title.configure(text="Raw Camera2 Sensor Viewfinder")
             self.cv_screen_sub.configure(text="Screen off / No camera app opened")
             self.cv_pip_box.place_forget()
@@ -773,7 +719,7 @@ class OmniCaptureApp(ctk.CTk):
             self.source_cam_check.select()
             self.master_record_btn.configure(text="Start Camera Record")
         elif scene_id == "screen":
-            self.canvas_mode_lbl.configure(text="PREVIEW: SCREEN RECORD")
+            self.canvas_mode_lbl.configure(text="Preview: Screen Record")
             self.cv_screen_title.configure(text="Mobile Display Recorder")
             self.cv_screen_sub.configure(text="Direct-to-PC storage")
             self.cv_pip_box.place_forget()
@@ -782,61 +728,57 @@ class OmniCaptureApp(ctk.CTk):
             self.master_record_btn.configure(text="Start Screen Record")
 
     # -------------------------------------------------------------------------
-    # 5. BROADCAST TELEMETRY STATUS BAR
+    # 4. BROADCAST TELEMETRY STATUS BAR
     # -------------------------------------------------------------------------
 
     def _build_status_footer(self):
-        footer = ctk.CTkFrame(self, fg_color=OmniTheme.BG_ROOT, height=28, corner_radius=0)
-        footer.pack(fill="x", side="bottom")
+        tokens = OmniTheme.get_tokens()
 
-        self.foot_status_lbl = ctk.CTkLabel(
-            footer,
-            text="STUDIO READY",
-            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            text_color=OmniTheme.STATUS_CONNECTED
-        )
-        self.foot_status_lbl.pack(side="left", padx=16)
+        self.footer = ctk.CTkFrame(self, fg_color=tokens.bg_header, height=28, corner_radius=0)
+        self.footer.pack(fill="x", side="bottom")
+
+        self.foot_status_chip = StatusChip(self.footer, text="STUDIO READY", state="ready")
+        self.foot_status_chip.pack(side="left", padx=12, pady=2)
 
         self.foot_rec_time = ctk.CTkLabel(
-            footer,
+            self.footer,
             text="REC: 00:00:00",
-            font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_MUTED
+            font=OmniTheme.font_mono(11),
+            text_color=tokens.text_muted
         )
-        self.foot_rec_time.pack(side="left", padx=12)
+        self.foot_rec_time.pack(side="left", padx=10)
 
         self.foot_fps_lbl = ctk.CTkLabel(
-            footer,
+            self.footer,
             text="FPS: 60.0",
-            font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_DIM
+            font=OmniTheme.font_mono(11),
+            text_color=tokens.text_dim
         )
-        self.foot_fps_lbl.pack(side="left", padx=12)
+        self.foot_fps_lbl.pack(side="left", padx=10)
 
         self.foot_bitrate_lbl = ctk.CTkLabel(
-            footer,
+            self.footer,
             text="BITRATE: 8.0M",
-            font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_DIM
+            font=OmniTheme.font_mono(11),
+            text_color=tokens.text_dim
         )
-        self.foot_bitrate_lbl.pack(side="left", padx=12)
+        self.foot_bitrate_lbl.pack(side="left", padx=10)
 
-        # Free Disk Space Telemetry
         self.foot_disk_lbl = ctk.CTkLabel(
-            footer,
+            self.footer,
             text=self._query_disk_space_str(),
-            font=OmniTheme.font_mono(10),
-            text_color=OmniTheme.TEXT_DIM
+            font=OmniTheme.font_mono(11),
+            text_color=tokens.text_dim
         )
-        self.foot_disk_lbl.pack(side="left", padx=12)
+        self.foot_disk_lbl.pack(side="left", padx=10)
 
-        hotkey_legend = ctk.CTkLabel(
-            footer,
-            text="Ctrl+Shift+P: Command Palette  ·  Ctrl+Alt+D: Record",
-            font=OmniTheme.font_label(),
-            text_color=OmniTheme.TEXT_DIM
+        self.hotkey_legend = ctk.CTkLabel(
+            self.footer,
+            text="Ctrl+P: Command Palette  ·  Ctrl+Alt+D: Record",
+            font=OmniTheme.font_caption(),
+            text_color=tokens.text_dim
         )
-        hotkey_legend.pack(side="right", padx=16)
+        self.hotkey_legend.pack(side="right", padx=16)
 
     def _query_disk_space_str(self) -> str:
         try:
@@ -848,11 +790,46 @@ class OmniCaptureApp(ctk.CTk):
             return "DISK: OK"
 
     # -------------------------------------------------------------------------
-    # 6. AUDIO LEVEL METER SIMULATION LOOP
+    # 5. RUNTIME THEME SWITCHING ENGINE
+    # -------------------------------------------------------------------------
+
+    def _toggle_theme(self):
+        """Switch between Light Minimal and Dark Liquid Glass instantly."""
+        new_theme = "light" if OmniTheme.get_tokens().is_dark else "dark"
+        self.app_config["theme"] = new_theme
+        OmniTheme.set_theme(new_theme)
+        tokens = OmniTheme.get_tokens()
+
+        # Update root & panels
+        self.configure(fg_color=tokens.bg_root)
+        self.canvas_panel.configure(fg_color=tokens.bg_panel, border_color=tokens.border_subtle)
+        self.inspector_panel.configure(fg_color=tokens.bg_panel, border_color=tokens.border_subtle)
+        self.dock_panel.configure(fg_color=tokens.bg_panel, border_color=tokens.border_subtle)
+        self.footer.configure(fg_color=tokens.bg_header)
+        self.canvas_viewport.configure(fg_color=tokens.bg_root)
+
+        # Update components
+        self.top_bar.apply_tokens(tokens)
+        self.cv_empty_state.apply_tokens(tokens)
+        self.strip_mic.apply_tokens(tokens)
+        self.strip_pc.apply_tokens(tokens)
+        self.foot_status_chip.apply_tokens(tokens)
+
+        # Update controls
+        self.master_mirror_btn.configure(fg_color=tokens.bg_input, hover_color=tokens.bg_hover, text_color=tokens.text_primary, border_color=tokens.border_subtle)
+        self.master_recordings_btn.configure(fg_color=tokens.bg_input, hover_color=tokens.bg_hover, text_color=tokens.text_primary, border_color=tokens.border_subtle)
+        self.master_settings_btn.configure(fg_color=tokens.bg_input, hover_color=tokens.bg_hover, text_color=tokens.text_primary, border_color=tokens.border_subtle)
+        self.wifi_switch_btn.configure(fg_color=tokens.bg_input, hover_color=tokens.bg_hover, text_color=tokens.text_primary, border_color=tokens.border_subtle)
+
+        # Re-apply DWM window frame
+        self._apply_dwm()
+        self.toasts.show("Theme Switched", f"Active theme: {tokens.name.title()}", level="info")
+
+    # -------------------------------------------------------------------------
+    # 6. AUDIO & RECORDING PULSE ANIMATIONS
     # -------------------------------------------------------------------------
 
     def _start_audio_level_animation(self):
-        """Animate VU audio meters smoothly to provide live feedback."""
         self._meter_timer_active = True
 
         def _loop():
@@ -864,6 +841,16 @@ class OmniCaptureApp(ctk.CTk):
                 self.strip_pc.simulate_audio_activity(active=is_active)
             except Exception:
                 pass
+
+            # Subtle Recording Pulse Animation
+            if is_active and self._recording_pulse_active:
+                self._pulse_phase = (self._pulse_phase + 1) % 16
+                pulse_color = "#DC2626" if self._pulse_phase < 8 else "#EF4444"
+                try:
+                    self.master_record_btn.configure(fg_color=pulse_color)
+                except Exception:
+                    pass
+
             self.after(80, _loop)
 
         self.after(500, _loop)
@@ -873,7 +860,6 @@ class OmniCaptureApp(ctk.CTk):
     # -------------------------------------------------------------------------
 
     def _open_command_palette(self):
-        """Open the Ctrl+Shift+P Command Palette."""
         commands = [
             {"title": "Start Dual Recording (PC + Phone)", "category": "Capture", "shortcut": "Ctrl+Alt+D", "action": self._on_start_dual_recording, "keywords": "rec video"},
             {"title": "Stop Active Recording", "category": "Capture", "shortcut": "Esc", "action": self._on_stop_dual_recording, "keywords": "end finish"},
@@ -885,13 +871,13 @@ class OmniCaptureApp(ctk.CTk):
             {"title": "Release Camera Hardware Lock", "category": "Hardware", "shortcut": "Ctrl+Shift+L", "action": self._on_release_lock, "keywords": "unlock busy sensor fix"},
             {"title": "Switch to Wireless ADB (Wi-Fi)", "category": "Hardware", "shortcut": "", "action": self._on_switch_to_wireless, "keywords": "tcp ip wireless"},
             {"title": "Refresh Connected Devices", "category": "Hardware", "shortcut": "F5", "action": self._on_manual_refresh, "keywords": "reload adb phone"},
+            {"title": "Toggle Theme (Light / Dark)", "category": "View", "shortcut": "", "action": self._toggle_theme, "keywords": "appearance dark light mode"},
             {"title": "System & Hardware Diagnostics", "category": "Tools", "shortcut": "", "action": self._open_diagnostics_window, "keywords": "info check debug ffmpeg"},
             {"title": "Studio Preferences & Settings", "category": "Settings", "shortcut": "Ctrl+,", "action": self._open_settings_window, "keywords": "config options format"},
             {"title": "Scene: Dual Stream", "category": "Scenes", "shortcut": "1", "action": lambda: self._select_scene("dual"), "keywords": "preset layout"},
             {"title": "Scene: Screen Mirror", "category": "Scenes", "shortcut": "2", "action": lambda: self._select_scene("mirror"), "keywords": "preset layout"},
             {"title": "Scene: Camera Viewfinder", "category": "Scenes", "shortcut": "3", "action": lambda: self._select_scene("camera"), "keywords": "preset layout"},
             {"title": "Scene: Screen Record", "category": "Scenes", "shortcut": "4", "action": lambda: self._select_scene("screen"), "keywords": "preset layout"},
-            {"title": "Toggle Safe Area Guides", "category": "View", "shortcut": "", "action": self._toggle_guides, "keywords": "grid frame overlay"},
             {"title": "Minimize to System Tray", "category": "Window", "shortcut": "Ctrl+W", "action": self._on_minimize_to_tray, "keywords": "hide background"},
             {"title": "Exit OmniCapture Studio", "category": "Window", "shortcut": "Ctrl+Q", "action": self._on_app_exit, "keywords": "quit close"},
         ]
@@ -918,15 +904,16 @@ class OmniCaptureApp(ctk.CTk):
         w.title("Keyboard Shortcuts")
         w.geometry("440x360")
         w.resizable(False, False)
-        w.configure(fg_color=OmniTheme.BG_ROOT)
+        tokens = OmniTheme.get_tokens()
+        w.configure(fg_color=tokens.bg_root)
 
-        box = ctk.CTkFrame(w, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD)
+        box = ctk.CTkFrame(w, fg_color=tokens.bg_panel, corner_radius=OmniTheme.RADIUS_CARD)
         box.pack(fill="both", expand=True, padx=16, pady=16)
 
-        ctk.CTkLabel(box, text="GLOBAL KEYBOARD SHORTCUTS", font=OmniTheme.font_section(), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", padx=14, pady=(12, 8))
+        ctk.CTkLabel(box, text="Global Keyboard Shortcuts", font=OmniTheme.font_section(), text_color=tokens.text_primary).pack(anchor="w", padx=14, pady=(12, 8))
 
         shortcuts = [
-            ("Ctrl + Shift + P", "Open Command Palette"),
+            ("Ctrl + P", "Open Command Palette"),
             ("Ctrl + Alt + D", "Start / Stop Dual Recording"),
             ("Ctrl + Alt + M", "Launch Screen Mirror"),
             ("Ctrl + Alt + C", "Launch Camera Viewfinder"),
@@ -942,15 +929,15 @@ class OmniCaptureApp(ctk.CTk):
         for key, desc in shortcuts:
             r = ctk.CTkFrame(box, fg_color="transparent")
             r.pack(fill="x", padx=14, pady=3)
-            ctk.CTkLabel(r, text=key, font=OmniTheme.font_mono(10, weight="bold"), text_color=OmniTheme.ACCENT_PRIMARY, width=140, anchor="w").pack(side="left")
-            ctk.CTkLabel(r, text=desc, font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_BODY).pack(side="left")
+            ctk.CTkLabel(r, text=key, font=OmniTheme.font_mono(10, weight="bold"), text_color=tokens.accent_primary, width=140, anchor="w").pack(side="left")
+            ctk.CTkLabel(r, text=desc, font=OmniTheme.font_body(), text_color=tokens.text_secondary).pack(side="left")
 
     def _open_about_dialog(self):
         messagebox.showinfo(
             "About OmniCapture Studio",
             "OmniCapture Studio v1.3.0\n\n"
-            "Professional Hardware-Accelerated Desktop Broadcast & Android Capture Console.\n"
-            "Engineered with OBS Studio architecture, low-latency Direct3D pipelines, "
+            "Hardware-Accelerated Dual PC Screen & Mobile Camera Studio.\n"
+            "Engineered with Windows 11 Fluent Design, DWM Mica/Acrylic support, "
             "and synchronized multi-stream recording.\n\n"
             "Open source under the Apache 2.0 License.",
             parent=self
@@ -961,6 +948,8 @@ class OmniCaptureApp(ctk.CTk):
         self.toasts.show("Window Layout", "Reset to default 1180x800 resolution", level="info")
 
     def _bind_keyboard_shortcuts(self):
+        self.bind("<Control-p>", lambda e: self._open_command_palette())
+        self.bind("<Control-P>", lambda e: self._open_command_palette())
         self.bind("<Control-Shift-P>", lambda e: self._open_command_palette())
         self.bind("<Control-Shift-p>", lambda e: self._open_command_palette())
         self.bind("<Control-k>", lambda e: self._open_command_palette())
@@ -970,7 +959,6 @@ class OmniCaptureApp(ctk.CTk):
         self.bind("<Control-q>", lambda e: self._on_app_exit())
         self.bind("<Control-w>", lambda e: self._on_minimize_to_tray())
 
-        # Scene quick switchers
         self.bind("1", lambda e: self._select_scene("dual") if not self._is_entry_focused() else None)
         self.bind("2", lambda e: self._select_scene("mirror") if not self._is_entry_focused() else None)
         self.bind("3", lambda e: self._select_scene("camera") if not self._is_entry_focused() else None)
@@ -1018,18 +1006,20 @@ class OmniCaptureApp(ctk.CTk):
             on_complete=self._on_dual_complete
         )
 
+        tokens = OmniTheme.get_tokens()
         if ok:
+            self._recording_pulse_active = True
             self.master_record_btn.configure(
                 text="Stop Recording",
-                fg_color=OmniTheme.STATUS_RECORDING,
-                hover_color=OmniTheme.STATUS_RECORDING_HOVER
+                fg_color=tokens.status_recording,
+                hover_color=tokens.status_recording_hover
             )
             self.cv_recording_hud.place(relx=0.5, rely=0.08, anchor="n")
-            self.foot_status_lbl.configure(text="● RECORDING", text_color=OmniTheme.STATUS_RECORDING)
+            self.foot_status_chip.set_status("RECORDING", state="recording")
             self.toasts.show("Recording Started", "Parallel dual streams recording to disk", level="success")
             self.tray.notify("OmniCapture Studio", "Dual recording in progress")
         else:
-            self.foot_status_lbl.configure(text=f"ERROR: {msg[:35]}", text_color=OmniTheme.STATUS_WARNING)
+            self.foot_status_chip.set_status(f"ERROR: {msg[:25]}", state="warning")
             self.toasts.show("Recording Failed", msg, level="error")
 
     def _on_dual_tick(self, elapsed: float, pc_sz: int, cam_sz: int):
@@ -1053,19 +1043,22 @@ class OmniCaptureApp(ctk.CTk):
         self.foot_rec_time.configure(text=f"REC: {time_str}")
 
     def _on_stop_dual_recording(self):
+        self._recording_pulse_active = False
         self.controller.stop_dual_recording()
 
     def _on_dual_complete(self, result: Dict[str, Any]):
         def _ui():
+            self._recording_pulse_active = False
+            tokens = OmniTheme.get_tokens()
             self.master_record_btn.configure(
                 text="Start Dual Record",
-                fg_color=OmniTheme.ACCENT_PRIMARY,
-                hover_color=OmniTheme.ACCENT_PRIMARY_HOVER
+                fg_color=tokens.accent_primary,
+                hover_color=tokens.accent_hover
             )
             self.cv_recording_hud.place_forget()
             status = result.get("status", "COMPLETE")
             dur = result.get("duration_formatted", "00:00")
-            self.foot_status_lbl.configure(text="STUDIO READY", text_color=OmniTheme.STATUS_CONNECTED)
+            self.foot_status_chip.set_status("STUDIO READY", state="ready")
             self.foot_rec_time.configure(text="REC: 00:00:00")
             self.foot_disk_lbl.configure(text=self._query_disk_space_str())
             self.toasts.show("Recording Saved", f"Capture completed ({dur})", level="success")
@@ -1147,25 +1140,24 @@ class OmniCaptureApp(ctk.CTk):
             batt = state.get("battery", {})
             lvl = batt.get("level", "")
             batt_str = f" · {lvl} ⚡" if lvl and lvl != "N/A" else ""
-            self.top_device_lbl.configure(
-                text=f"● {model} ({conn_str}){batt_str}",
-                text_color=OmniTheme.STATUS_CONNECTED
-            )
+            device_text = f"● {model} ({conn_str}){batt_str}"
+            self.top_bar.set_device_status(device_text)
+
+            # Switch Canvas from Empty State to Active Viewport Representation
+            self.cv_empty_state.place_forget()
+            self.cv_content.place(relx=0.5, rely=0.5, anchor="center")
         elif status == "UNAUTHORIZED":
-            self.top_device_lbl.configure(
-                text="Unauthorized: unlock phone and tap 'Always allow'",
-                text_color=OmniTheme.STATUS_WARNING
-            )
+            self.top_bar.set_device_status("Unauthorized: unlock phone and tap 'Always allow'")
+            self.cv_content.place_forget()
+            self.cv_empty_state.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.7)
         elif status == "OFFLINE":
-            self.top_device_lbl.configure(
-                text="Device offline: reconnect USB cable",
-                text_color=OmniTheme.STATUS_WARNING
-            )
+            self.top_bar.set_device_status("Device offline: reconnect USB cable")
+            self.cv_content.place_forget()
+            self.cv_empty_state.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.7)
         else:
-            self.top_device_lbl.configure(
-                text="No device connected (connect phone via USB & enable USB debugging)",
-                text_color=OmniTheme.TEXT_MUTED
-            )
+            self.top_bar.set_device_status("Connect a phone via USB to start")
+            self.cv_content.place_forget()
+            self.cv_empty_state.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.7)
 
     def _on_manual_refresh(self):
         self.controller.refresh_device_now()
