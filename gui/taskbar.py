@@ -4,6 +4,7 @@ import ctypes
 from ctypes import wintypes
 from typing import Optional
 from PIL import Image, ImageDraw
+from core.version import APP_USER_MODEL_ID
 
 class TaskbarManager:
     """
@@ -23,8 +24,9 @@ class TaskbarManager:
     _app_user_model_id_set = False
 
     @classmethod
-    def set_app_user_model_id(cls, app_id: str = "OmniCapture.Studio.Desktop.1.4.dev"):
+    def set_app_user_model_id(cls, app_id: Optional[str] = None):
         """Register explicit AppUserModelID for taskbar pinning and grouping."""
+        app_id = app_id or APP_USER_MODEL_ID
         if sys.platform == "win32" and not cls._app_user_model_id_set:
             try:
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)

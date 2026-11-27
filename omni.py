@@ -58,12 +58,14 @@ def load_config() -> dict:
             pass
     return default_cfg
 
+from core.version import VERSION
+
 def save_config(cfg: dict):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
 def print_banner():
-    print("OmniCapture v1.4.0-dev")
+    print(f"OmniCapture Studio v{VERSION}")
     print("Android & PC Desktop Capture Suite\n")
 
 def get_system_status(adb: ADBManager, scrcpy: ScrcpyEngine) -> dict:

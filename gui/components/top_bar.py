@@ -5,6 +5,7 @@ from PIL import Image
 from gui.theme import OmniTheme, ThemeTokens
 from gui.components.menu_dropdown import MenuDropdown
 from core.resource_path import resolve_resource
+from core.version import VERSION
 
 class UnifiedTopBar(ctk.CTkFrame):
     """
@@ -79,7 +80,7 @@ class UnifiedTopBar(ctk.CTkFrame):
         # Version Pill
         self.ver_lbl = ctk.CTkLabel(
             self.left_box,
-            text="v1.4.0-dev",
+            text=f"v{VERSION}",
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
         )

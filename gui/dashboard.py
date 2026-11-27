@@ -25,6 +25,7 @@ from core.settings_manager import (
     get_adaptive_default_geometry,
     get_adaptive_minimum_geometry
 )
+from core.version import VERSION, APP_NAME, APP_USER_MODEL_ID
 from core.notifications import NotificationManager
 from gui.components.top_bar import UnifiedTopBar
 from gui.components.audio_meter import AudioChannelStrip
@@ -60,7 +61,7 @@ class OmniCaptureApp(ctk.CTk):
 
     def __init__(self, config: Dict[str, Any]):
         # Enforce explicit Windows AppUserModelID for taskbar grouping & icon
-        TaskbarManager.set_app_user_model_id("OmniCapture.Studio.Desktop.1.4.dev")
+        TaskbarManager.set_app_user_model_id(APP_USER_MODEL_ID)
 
         # Single instance enforcement via Win32 named mutex
         self.single_instance = SingleInstanceManager()
@@ -95,7 +96,7 @@ class OmniCaptureApp(ctk.CTk):
 
         # Appearance & Window Configuration
         tokens = OmniTheme.get_tokens()
-        self.title("OmniCapture Studio")
+        self.title(f"{APP_NAME} v{VERSION}")
         min_w, min_h = get_adaptive_minimum_geometry()
         self.minsize(min_w, min_h)
         self._restore_window_geometry()
@@ -1418,8 +1419,8 @@ class OmniCaptureApp(ctk.CTk):
 
     def _open_about_dialog(self):
         messagebox.showinfo(
-            "About OmniCapture Studio",
-            "OmniCapture Studio v1.4.0-dev\n\n"
+            f"About {APP_NAME}",
+            f"{APP_NAME} v{VERSION}\n\n"
             "Hardware-Accelerated Dual PC Screen & Mobile Camera Studio.\n"
             "Engineered with Windows 11 Fluent Design, DWM Mica/Acrylic support, "
             "and synchronized multi-stream recording.\n\n"

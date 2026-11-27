@@ -8,7 +8,7 @@ import ctypes
 from ctypes import wintypes
 from pathlib import Path
 
-BASE_DIR = Path(r"E:\github projects\OmniCapture")
+BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from core.pc_recorder import PCRecorder

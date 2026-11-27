@@ -15,7 +15,7 @@ from gui.dashboard import OmniCaptureApp
 from gui.dialogs.component_gallery import ComponentGalleryWindow
 from gui.theme import OmniTheme
 
-ARTIFACTS_DIR = Path(r"C:\Users\alone\.gemini\antigravity\brain\81f53aa8-40d6-48c9-aad0-dcdc3f658a18")
+ARTIFACTS_DIR = Path(os.environ.get("OMNICAPTURE_ARTIFACTS_DIR", str(REPO_ROOT / "docs" / "qa_shots")))
 
 class BITMAPINFOHEADER(ctypes.Structure):
     _fields_ = [

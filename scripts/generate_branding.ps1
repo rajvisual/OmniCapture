@@ -265,5 +265,5 @@ public class BrandingGenerator
 "@
 
 Add-Type -TypeDefinition $code -ReferencedAssemblies System.Drawing
-$repo = "E:\github projects\OmniCapture"
+$repo = (Get-Item $PSScriptRoot).Parent.FullName
 [BrandingGenerator]::GenerateAll($repo)

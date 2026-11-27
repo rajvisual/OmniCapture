@@ -74,7 +74,7 @@ def capture_hwnd(hwnd, out_path: Path):
 def main():
     SCREENSHOT_DIR = BASE_DIR / "assets" / "screenshots"
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    BRAIN_DIR = Path(r"C:\Users\alone\.gemini\antigravity\brain\81f53aa8-40d6-48c9-aad0-dcdc3f658a18")
+    BRAIN_DIR = Path(os.environ.get("OMNICAPTURE_ARTIFACTS_DIR", str(BASE_DIR / "docs" / "qa_shots")))
 
     cfg = {
         "scrcpy_dir": "bin",
