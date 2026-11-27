@@ -2,12 +2,13 @@ import time
 from typing import Optional, List
 import customtkinter as ctk
 
-from gui.theme import OmniTheme
+from gui.theme import OmniTheme, ThemeTokens
 
 class ToastNotification(ctk.CTkFrame):
     """
     Individual non-blocking desktop toast banner.
     Rendered with crisp desktop typography, semantic accent stripe, and dismiss button.
+    Fully theme-aware and WCAG AA contrast compliant.
     """
 
     def __init__(
@@ -16,15 +17,16 @@ class ToastNotification(ctk.CTkFrame):
         title: str,
         message: str,
         level: str = "info",
-        duration_ms: int = 4000,
+        duration_ms: int = 3000,
         on_dismiss: Optional[callable] = None,
         **kwargs
     ):
+        tokens = OmniTheme.get_tokens()
         super().__init__(
             parent,
-            fg_color=OmniTheme.BG_CARD,
+            fg_color=tokens.bg_raised,
             border_width=1,
-            border_color=OmniTheme.BORDER_DEFAULT,
+            border_color=tokens.border_default,
             corner_radius=OmniTheme.RADIUS_POPUP,
             **kwargs
         )
@@ -35,16 +37,16 @@ class ToastNotification(ctk.CTkFrame):
 
         # Determine accent color based on level
         if level == "success":
-            accent = OmniTheme.STATUS_CONNECTED
+            accent = tokens.status_connected
             symbol = "✓"
         elif level == "warning":
-            accent = OmniTheme.STATUS_WARNING
+            accent = tokens.status_warning
             symbol = "⚠"
         elif level == "error":
-            accent = OmniTheme.STATUS_RECORDING
+            accent = tokens.status_recording
             symbol = "✕"
         else:
-            accent = OmniTheme.ACCENT_PRIMARY
+            accent = tokens.accent_primary
             symbol = "ℹ"
 
         # Accent border indicator on left
@@ -63,7 +65,7 @@ class ToastNotification(ctk.CTkFrame):
             header,
             text=f"{symbol}  {title}",
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
-            text_color=OmniTheme.TEXT_MAIN,
+            text_color=tokens.text_primary,
             anchor="w"
         ).pack(side="left")
 
@@ -75,8 +77,8 @@ class ToastNotification(ctk.CTkFrame):
             height=20,
             font=ctk.CTkFont(size=13),
             fg_color="transparent",
-            hover_color=OmniTheme.BG_INPUT,
-            text_color=OmniTheme.TEXT_MUTED,
+            hover_color=tokens.bg_hover,
+            text_color=tokens.text_muted,
             command=self.dismiss
         )
         close_btn.pack(side="right", padx=(0, 6), pady=6, anchor="n")
@@ -87,14 +89,14 @@ class ToastNotification(ctk.CTkFrame):
                 content,
                 text=message,
                 font=OmniTheme.font_label(),
-                text_color=OmniTheme.TEXT_BODY,
+                text_color=tokens.text_secondary,
                 anchor="w",
                 justify="left",
                 wraplength=280
             )
             msg_lbl.pack(fill="x", pady=(2, 0))
 
-        # Schedule auto-dismiss
+        # Schedule auto-dismiss (strictly 3 seconds by default)
         if duration_ms > 0:
             self._dismiss_job = self.after(duration_ms, self.dismiss)
 
@@ -117,15 +119,16 @@ class ToastNotification(ctk.CTkFrame):
 class ToastNotificationManager:
     """
     Manages in-app floating toast notifications inside the desktop window.
-    Positions banners neatly in the top-right corner with zero impact on main workflow.
+    Positions banners neatly in the bottom-right corner above the telemetry footer,
+    stacking vertically upwards so primary controls are never obstructed.
     """
 
     def __init__(self, root_window: ctk.CTk):
         self.root = root_window
         self.active_toasts: List[ToastNotification] = []
 
-    def show(self, title: str, message: str = "", level: str = "info", duration_ms: int = 3800):
-        """Display an in-app non-blocking toast."""
+    def show(self, title: str, message: str = "", level: str = "info", duration_ms: int = 3000):
+        """Display an in-app non-blocking toast with 3s auto-dismiss."""
         # Ensure executed on the Tkinter GUI thread
         self.root.after(0, lambda: self._create_toast(title, message, level, duration_ms))
 
@@ -153,12 +156,12 @@ class ToastNotificationManager:
         self._reposition_toasts()
 
     def _reposition_toasts(self):
-        # Stack from top-right corner downward
-        top_offset = 54
-        for toast in self.active_toasts:
+        # Position in bottom-right corner, stacked vertically upwards above 28px footer
+        y_bottom_offset = 38
+        for toast in reversed(self.active_toasts):
             try:
-                toast.place(relx=0.985, y=top_offset, anchor="ne")
+                toast.place(relx=0.985, rely=1.0, y=-y_bottom_offset, anchor="se")
                 toast.lift()
-                top_offset += 72
+                y_bottom_offset += 68
             except Exception:
                 pass

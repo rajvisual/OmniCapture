@@ -47,6 +47,36 @@ class DWMManager:
             return None
 
     @classmethod
+    def is_transparency_enabled(cls) -> bool:
+        """Check if Windows transparency effects are enabled in user personalize settings."""
+        if sys.platform != "win32":
+            return False
+        import winreg
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+            )
+            val, _ = winreg.QueryValueEx(key, "EnableTransparency")
+            winreg.CloseKey(key)
+            return val == 1
+        except Exception:
+            return True
+
+    @classmethod
+    def is_reduced_motion_enabled(cls) -> bool:
+        """Check if client area animations are disabled in Windows system parameters."""
+        if sys.platform != "win32":
+            return False
+        try:
+            val = c_int()
+            # SPI_GETCLIENTAREAANIMATION = 0x1042
+            ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, byref(val), 0)
+            return val.value == 0
+        except Exception:
+            return False
+
+    @classmethod
     def apply_theme(
         cls,
         window,
@@ -60,7 +90,7 @@ class DWMManager:
         - Immersive dark or light titlebar
         - Exact caption color synchronization
         - Rounded window corners (DWMWCP_ROUND)
-        - Windows 11 Mica / Acrylic backdrop
+        - Windows 11 Mica / Acrylic backdrop (falls back to solid if transparency disabled)
         """
         if sys.platform != "win32":
             return
@@ -70,6 +100,10 @@ class DWMManager:
             return
 
         dwmapi = ctypes.windll.dwmapi
+
+        # Fall back from Mica to Solid if Windows transparency is disabled
+        if not cls.is_transparency_enabled() and backdrop_type in (2, 3, 4):
+            backdrop_type = cls.DWMSBT_NONE
 
         # 1. Immersive Dark Mode
         try:

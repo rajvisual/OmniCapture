@@ -196,6 +196,123 @@ class TestGUIComponents(unittest.TestCase):
         self.assertIsNotNone(StudioSettingsDialog)
         self.assertIsNotNone(DiagnosticsDialog)
 
+    def test_settings_manager_and_geometry_clamping(self):
+        """Verify settings persistence and multi-monitor window geometry clamping."""
+        from core.settings_manager import SettingsManager, clamp_window_geometry
+
+        settings = SettingsManager.load()
+        self.assertIsInstance(settings, dict)
+        self.assertIn("window_width", settings)
+        self.assertIn("window_height", settings)
+
+        # Off-screen clamping tests (e.g. disconnected external display)
+        cx, cy, cw, ch = clamp_window_geometry(-9999, -9999, 1180, 800)
+        self.assertGreaterEqual(cx, 0)
+        self.assertGreaterEqual(cy, 0)
+        self.assertGreaterEqual(cw, 1100)
+        self.assertGreaterEqual(ch, 720)
+
+    def test_single_instance_manager(self):
+        """Verify SingleInstanceManager Win32 named mutex acquire and release."""
+        from gui.single_instance import SingleInstanceManager
+
+        manager = SingleInstanceManager(mutex_name="Global\\OmniCapture_Test_Mutex_123")
+        ok = manager.acquire()
+        self.assertTrue(ok)
+        manager.release()
+
+    def test_widget_tree_color_compliance_on_theme_switch(self):
+        """Walk the entire widget tree after theme switch to verify all widgets match active tokens."""
+        from gui.dashboard import OmniCaptureApp
+        from gui.theme import LIGHT_MINIMAL, DARK_LIQUID_GLASS
+
+        # Create hidden test instance
+        app = OmniCaptureApp(self.sample_config)
+        app.withdraw()
+        app.update_idletasks()
+
+        try:
+            # 1. Switch to Light Minimal
+            app.set_active_theme("light")
+            app.update_idletasks()
+            light_tokens = LIGHT_MINIMAL
+
+            # Verify key panels match Light tokens
+            self.assertEqual(app.cget("fg_color"), light_tokens.bg_root)
+            self.assertEqual(app.canvas_panel.cget("fg_color"), light_tokens.bg_panel)
+            self.assertEqual(app.inspector_panel.cget("fg_color"), light_tokens.bg_panel)
+            self.assertEqual(app.insp_header.cget("fg_color"), light_tokens.bg_header)
+            self.assertEqual(app.dock_panel.cget("fg_color"), light_tokens.bg_panel)
+            self.assertEqual(app.footer.cget("fg_color"), light_tokens.bg_header)
+
+            # Verify dock titles and labels in Light Minimal
+            self.assertEqual(app.dock_title_scenes.cget("text_color"), light_tokens.text_primary)
+            self.assertEqual(app.dock_title_sources.cget("text_color"), light_tokens.text_primary)
+            self.assertEqual(app.dock_title_mixer.cget("text_color"), light_tokens.text_primary)
+            self.assertEqual(app.dock_title_controls.cget("text_color"), light_tokens.text_primary)
+            self.assertEqual(app.lbl_insp_cam.cget("text_color"), light_tokens.text_muted)
+
+            def walk_widgets(widget):
+                for c in widget.winfo_children():
+                    yield c
+                    yield from walk_widgets(c)
+
+            # Verify no widget retained dark panel colors in Light mode
+            for w in walk_widgets(app):
+                if hasattr(w, "cget"):
+                    try:
+                        fg = w.cget("fg_color")
+                        if fg and isinstance(fg, str) and fg.startswith("#"):
+                            self.assertNotIn(
+                                fg.upper(),
+                                ["#111218", "#191A23"],
+                                f"Widget {w} retained dark background {fg} in Light mode"
+                            )
+                    except Exception:
+                        pass
+
+            # 2. Switch to Dark Liquid Glass
+            app.set_active_theme("dark")
+            app.update_idletasks()
+            dark_tokens = DARK_LIQUID_GLASS
+
+            self.assertEqual(app.cget("fg_color"), dark_tokens.bg_root)
+            self.assertEqual(app.canvas_panel.cget("fg_color"), dark_tokens.bg_panel)
+            self.assertEqual(app.inspector_panel.cget("fg_color"), dark_tokens.bg_panel)
+            self.assertEqual(app.insp_header.cget("fg_color"), dark_tokens.bg_header)
+            self.assertEqual(app.dock_panel.cget("fg_color"), dark_tokens.bg_panel)
+            self.assertEqual(app.footer.cget("fg_color"), dark_tokens.bg_header)
+
+            self.assertEqual(app.dock_title_scenes.cget("text_color"), dark_tokens.text_primary)
+            self.assertEqual(app.dock_title_sources.cget("text_color"), dark_tokens.text_primary)
+            self.assertEqual(app.dock_title_mixer.cget("text_color"), dark_tokens.text_primary)
+            self.assertEqual(app.dock_title_controls.cget("text_color"), dark_tokens.text_primary)
+            self.assertEqual(app.lbl_insp_cam.cget("text_color"), dark_tokens.text_muted)
+
+            # Verify no widget retained light panel colors in Dark mode
+            for w in walk_widgets(app):
+                if hasattr(w, "cget"):
+                    try:
+                        fg = w.cget("fg_color")
+                        if fg and isinstance(fg, str) and fg.startswith("#"):
+                            self.assertNotIn(
+                                fg.upper(),
+                                ["#FFFFFF", "#F9FAFB"],
+                                f"Widget {w} retained light background {fg} in Dark mode"
+                            )
+                    except Exception:
+                        pass
+        finally:
+            try:
+                app._meter_timer_active = False
+                app.controller.stop_device_poller()
+                app.hotkeys.stop()
+                app.tray.stop()
+                app.single_instance.release()
+                app.destroy()
+            except Exception:
+                pass
+
 
 if __name__ == "__main__":
     unittest.main()

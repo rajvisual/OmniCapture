@@ -151,6 +151,7 @@ class ThemeTokens:
             ("status_recording on bg_root", self.status_recording, self.bg_root, 3.0),
             ("status_connected on bg_root", self.status_connected, self.bg_root, 3.0),
             ("border_focus on bg_root", self.border_focus, self.bg_root, 3.0),
+            ("border_default on bg_panel", self.border_default, self.bg_panel, 3.0),
             ("border_default on bg_root", self.border_default, self.bg_root, 1.5)
         ]
         results = {}
@@ -174,12 +175,12 @@ LIGHT_MINIMAL = ThemeTokens(
     bg_panel="#FFFFFF",             # Pure crisp white panels
     bg_raised="#FFFFFF",            # Raised controls with 1px border
     bg_header="#F8FAFC",            # Subtle top bar
-    bg_input="#F1F3F5",             # Neutral inputs
+    bg_input="#F1F3F5",             # Neutral inputs (distinct visible fill)
     bg_hover="#E9ECEF",             # Crisp hover
     bg_active="#DEE2E6",
     border_subtle="#E5E7EB",        # 1px subtle divider
-    border_default="#9CA3AF",       # Control boundaries (contrast 2.31:1 on soft grey)
-    border_focus="#2563EB",         # Clear focus ring
+    border_default="#71717A",       # Control boundaries (contrast 4.83:1 on white, 4.38:1 on soft grey)
+    border_focus="#2563EB",         # Clear focus ring (5.17:1)
     border_specular="#FFFFFF",
     text_primary="#111827",         # Near-black high contrast (16.1:1)
     text_secondary="#374151",       # Mid-grey (10.3:1)
@@ -222,12 +223,12 @@ DARK_LIQUID_GLASS = ThemeTokens(
     bg_panel="#111218",             # 88% opaque high-contrast reading surface
     bg_raised="#181922",            # Raised controls and cards
     bg_header="#13141D",            # Liquid glass header dock
-    bg_input="#1A1B26",             # Form controls
+    bg_input="#1A1B26",             # Form controls (distinct visible fill)
     bg_hover="#232534",             # Smooth hover surface
     bg_active="#2C2F42",
     border_subtle="#222432",        # Low-contrast boundaries
-    border_default="#32354A",       # Control outlines (contrast 1.62:1 on #0B0C10)
-    border_focus="#3B82F6",         # Focus ring
+    border_default="#5B6275",       # Control outlines (contrast 3.07:1 on #111218)
+    border_focus="#3B82F6",         # Focus ring (5.31:1)
     border_specular="#3D4158",      # 1px top specular highlight
     text_primary="#F9FAFB",         # Pure high-contrast white (18.7:1)
     text_secondary="#D1D5DB",       # Secondary reading text (12.7:1)

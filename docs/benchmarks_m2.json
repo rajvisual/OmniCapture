@@ -1,0 +1,40 @@
+{
+  "machine_specs": {
+    "os": "Windows 11 (Build 10.0.26300)",
+    "arch": "AMD64",
+    "python_version": "3.12.10",
+    "cpu_model": "AMD Ryzen 3 3250U with Radeon Graphics",
+    "cpu_count_logical": 4,
+    "total_ram_gb": 5.88,
+    "avail_ram_gb": 0.73
+  },
+  "cold_start": {
+    "runs": [
+      1726.09,
+      655.52,
+      613.85,
+      657.16,
+      630.0,
+      626.04,
+      634.93,
+      659.5,
+      1177.45,
+      620.2
+    ],
+    "median_ms": 645.22,
+    "mean_ms": 800.07,
+    "min_ms": 613.85,
+    "max_ms": 1726.09
+  },
+  "telemetry": {
+    "idle_cpu_avg_pct": 0.19,
+    "idle_cpu_max_pct": 8.45,
+    "idle_ram_avg_mb": 96.99,
+    "idle_ram_peak_mb": 98.58,
+    "idle_ram_private_mb": 66.77,
+    "rec_ui_cpu_avg_pct": 0.26,
+    "rec_ui_cpu_max_pct": 0.77,
+    "rec_ram_avg_mb": 97.23
+  },
+  "timestamp": "2026-11-27 21:51:44"
+}

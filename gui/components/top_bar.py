@@ -12,6 +12,7 @@ class UnifiedTopBar(ctk.CTkFrame):
     Replaces the white native Win32 menu bar with an integrated top bar:
     - App icon, title, and version
     - In-app styled menu items (File, Capture, Tools, View, Settings, Help)
+    - Full Alt-key mnemonic support (Alt+F, Alt+C, Alt+T, Alt+V, Alt+S, Alt+H)
     - Centered command / status search pill
     - Quick actions: Theme toggle (☀ / 🌙), Refresh (F5), Release Lock
     """
@@ -43,6 +44,8 @@ class UnifiedTopBar(ctk.CTkFrame):
         self.on_refresh = on_refresh
         self.on_release_lock = on_release_lock
         self.on_toggle_theme = on_toggle_theme
+        self.menu_button_map: Dict[str, ctk.CTkButton] = {}
+        self.active_dropdown: Optional[MenuDropdown] = None
 
         self._build_ui(tokens)
 
@@ -50,8 +53,8 @@ class UnifiedTopBar(ctk.CTkFrame):
         # ---------------------------------------------------------------------
         # LEFT: App Brand + In-App Menus
         # ---------------------------------------------------------------------
-        left_box = ctk.CTkFrame(self, fg_color="transparent")
-        left_box.pack(side="left", padx=12, pady=6)
+        self.left_box = ctk.CTkFrame(self, fg_color="transparent")
+        self.left_box.pack(side="left", padx=12, pady=6)
 
         # App Icon
         logo_path = resolve_resource("assets/logo/omnicapture-icon.png")
@@ -59,13 +62,13 @@ class UnifiedTopBar(ctk.CTkFrame):
             try:
                 pil_img = Image.open(str(logo_path)).resize((20, 20), Image.Resampling.LANCZOS)
                 self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
-                ctk.CTkLabel(left_box, image=self.logo_ctk, text="").pack(side="left", padx=(0, 8))
+                ctk.CTkLabel(self.left_box, image=self.logo_ctk, text="").pack(side="left", padx=(0, 8))
             except Exception:
                 pass
 
         # App Title
         self.title_lbl = ctk.CTkLabel(
-            left_box,
+            self.left_box,
             text="OmniCapture",
             font=OmniTheme.font_body_bold(),
             text_color=tokens.text_primary
@@ -74,7 +77,7 @@ class UnifiedTopBar(ctk.CTkFrame):
 
         # Version Pill
         self.ver_lbl = ctk.CTkLabel(
-            left_box,
+            self.left_box,
             text="v1.3.0",
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
@@ -82,16 +85,16 @@ class UnifiedTopBar(ctk.CTkFrame):
         self.ver_lbl.pack(side="left", padx=(0, 12))
 
         # In-App Menu Items
-        self._build_menu_buttons(left_box, tokens)
+        self._build_menu_buttons(self.left_box, tokens)
 
         # ---------------------------------------------------------------------
         # CENTER: Command & Device Status Pill
         # ---------------------------------------------------------------------
-        center_box = ctk.CTkFrame(self, fg_color="transparent")
-        center_box.pack(side="left", expand=True)
+        self.center_box = ctk.CTkFrame(self, fg_color="transparent")
+        self.center_box.pack(side="left", expand=True)
 
         self.center_pill = ctk.CTkButton(
-            center_box,
+            self.center_box,
             text="🔍  Search commands, scenes, devices (Ctrl+P)",
             width=280,
             height=28,
@@ -109,13 +112,13 @@ class UnifiedTopBar(ctk.CTkFrame):
         # ---------------------------------------------------------------------
         # RIGHT: Quick Action Buttons & Theme Switcher
         # ---------------------------------------------------------------------
-        right_box = ctk.CTkFrame(self, fg_color="transparent")
-        right_box.pack(side="right", padx=12, pady=6)
+        self.right_box = ctk.CTkFrame(self, fg_color="transparent")
+        self.right_box.pack(side="right", padx=12, pady=6)
 
         # 1. Theme Switcher (☀ / 🌙)
         theme_icon = "☀ Light" if tokens.is_dark else "🌙 Dark"
         self.btn_theme = ctk.CTkButton(
-            right_box,
+            self.right_box,
             text=theme_icon,
             width=68,
             height=28,
@@ -132,7 +135,7 @@ class UnifiedTopBar(ctk.CTkFrame):
 
         # 2. Refresh Devices (F5)
         self.btn_refresh = ctk.CTkButton(
-            right_box,
+            self.right_box,
             text="Refresh",
             width=65,
             height=28,
@@ -149,7 +152,7 @@ class UnifiedTopBar(ctk.CTkFrame):
 
         # 3. Release Camera Lock
         self.btn_lock = ctk.CTkButton(
-            right_box,
+            self.right_box,
             text="Release Lock",
             width=88,
             height=28,
@@ -166,6 +169,7 @@ class UnifiedTopBar(ctk.CTkFrame):
 
     def _build_menu_buttons(self, parent, tokens: ThemeTokens):
         self.menu_buttons = []
+        self.menu_button_map.clear()
         menus = [
             ("File", self._get_file_menu_items()),
             ("Capture", self._get_capture_menu_items()),
@@ -190,11 +194,44 @@ class UnifiedTopBar(ctk.CTkFrame):
             btn.configure(command=lambda b=btn, it=items: self._open_dropdown(b, it))
             btn.pack(side="left", padx=1)
             self.menu_buttons.append(btn)
+            self.menu_button_map[label] = btn
 
-    def _open_dropdown(self, button, items: List[Dict[str, Any]]):
+    def open_menu_by_name(self, name: str):
+        """Programmatically open a menu dropdown by its name or initial mnemonic."""
+        target = name.lower()
+        menus = {
+            "file": self._get_file_menu_items,
+            "capture": self._get_capture_menu_items,
+            "tools": self._get_tools_menu_items,
+            "view": self._get_view_menu_items,
+            "settings": self._get_settings_menu_items,
+            "help": self._get_help_menu_items,
+        }
+        for label, btn in self.menu_button_map.items():
+            if label.lower() == target or label.lower().startswith(target):
+                getter = menus.get(label.lower())
+                if getter:
+                    self._open_dropdown(btn, getter())
+                break
+
+    def set_device_status(self, text: str):
+        """Update center command & device status readout."""
+        try:
+            self.center_pill.configure(text=text)
+        except Exception:
+            pass
+
+    def _open_dropdown(self, button: ctk.CTkButton, items: List[Dict[str, Any]]):
+        if self.active_dropdown:
+            try:
+                self.active_dropdown.close()
+            except Exception:
+                pass
+            self.active_dropdown = None
+
         x = button.winfo_rootx()
         y = button.winfo_rooty() + button.winfo_height() + 2
-        MenuDropdown(self.winfo_toplevel(), items, x, y)
+        self.active_dropdown = MenuDropdown(self.winfo_toplevel(), items, x, y)
 
     def _get_file_menu_items(self) -> list:
         h = self.menu_handlers
@@ -248,26 +285,27 @@ class UnifiedTopBar(ctk.CTkFrame):
         return [
             {"label": "Studio Preferences...", "accelerator": "Ctrl+,", "command": h.get("open_settings")},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
+            {"separator": True},
+            {"label": "Keyboard Shortcuts Guide", "command": h.get("open_hotkeys_guide")},
         ]
 
     def _get_help_menu_items(self) -> list:
         h = self.menu_handlers
         return [
-            {"label": "Keyboard Shortcuts Guide", "command": h.get("open_hotkeys_guide")},
+            {"label": "Keyboard Shortcuts", "accelerator": "Ctrl+/", "command": h.get("open_hotkeys_guide")},
+            {"label": "Hardware Diagnostics", "command": h.get("open_diagnostics")},
             {"separator": True},
             {"label": "About OmniCapture Studio", "command": h.get("open_about")},
         ]
 
-    def set_device_status(self, text: str):
-        self.center_pill.configure(text=f"🔍  {text}")
-
     def apply_tokens(self, tokens: ThemeTokens):
-        self.configure(
-            fg_color=tokens.bg_header,
-            border_color=tokens.border_subtle
-        )
+        """Update TopBar widget colors dynamically on theme switch."""
+        self.configure(fg_color=tokens.bg_header, border_color=tokens.border_subtle)
         self.title_lbl.configure(text_color=tokens.text_primary)
         self.ver_lbl.configure(text_color=tokens.text_dim)
+
+        for btn in self.menu_buttons:
+            btn.configure(hover_color=tokens.bg_hover, text_color=tokens.text_secondary)
 
         self.center_pill.configure(
             fg_color=tokens.bg_input,
@@ -296,9 +334,3 @@ class UnifiedTopBar(ctk.CTkFrame):
             text_color=tokens.text_muted,
             border_color=tokens.border_subtle
         )
-
-        for btn in getattr(self, "menu_buttons", []):
-            btn.configure(
-                hover_color=tokens.bg_hover,
-                text_color=tokens.text_secondary
-            )
