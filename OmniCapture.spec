@@ -30,6 +30,15 @@ hiddenimports = [
     "customtkinter",
     "googleapiclient",
     "google_auth_oauthlib",
+    "gui.components",
+    "gui.components.audio_meter",
+    "gui.components.toast",
+    "gui.components.command_palette",
+    "gui.dialogs",
+    "gui.dialogs.recordings",
+    "gui.dialogs.settings",
+    "gui.dialogs.diagnostics",
+    "gui.menu_bar",
 ] + ctk_hiddenimports
 
 a = Analysis(

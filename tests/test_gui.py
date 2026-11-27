@@ -115,5 +115,46 @@ class TestGUIComponents(unittest.TestCase):
         hotkeys._hotkeys[1]()
         self.assertEqual(triggered, ["dual"])
 
+    def test_theme_tokens_extended(self):
+        """Verify extended design tokens, spacing scale, and font factories."""
+        self.assertEqual(OmniTheme.SPACE_XS, 4)
+        self.assertEqual(OmniTheme.SPACE_SM, 8)
+        self.assertEqual(OmniTheme.SPACE_MD, 12)
+        self.assertEqual(OmniTheme.SPACE_LG, 16)
+        self.assertEqual(OmniTheme.RADIUS_CONTROL, 4)
+
+        self.assertTrue(OmniTheme.VU_GREEN.startswith("#"))
+        self.assertTrue(OmniTheme.VU_YELLOW.startswith("#"))
+        self.assertTrue(OmniTheme.VU_RED.startswith("#"))
+
+        self.assertIsNotNone(OmniTheme.font_title())
+        self.assertIsNotNone(OmniTheme.font_section())
+        self.assertIsNotNone(OmniTheme.font_body())
+        self.assertIsNotNone(OmniTheme.font_mono())
+
+    def test_components_and_dialogs_import(self):
+        """Verify all desktop components and dialogs are importable and exposed."""
+        from gui import (
+            AudioChannelStrip,
+            ToastNotificationManager,
+            CommandPalette,
+            DesktopMenuBar,
+            OmniCaptureApp,
+        )
+        from gui.dialogs import (
+            RecordingsGalleryDialog,
+            StudioSettingsDialog,
+            DiagnosticsDialog,
+        )
+        self.assertIsNotNone(AudioChannelStrip)
+        self.assertIsNotNone(ToastNotificationManager)
+        self.assertIsNotNone(CommandPalette)
+        self.assertIsNotNone(DesktopMenuBar)
+        self.assertIsNotNone(OmniCaptureApp)
+        self.assertIsNotNone(RecordingsGalleryDialog)
+        self.assertIsNotNone(StudioSettingsDialog)
+        self.assertIsNotNone(DiagnosticsDialog)
+
+
 if __name__ == "__main__":
     unittest.main()
