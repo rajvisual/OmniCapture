@@ -21,18 +21,59 @@
 
 ---
 
-## ⚡ Quick Download & Version Selection
+## ⚡ Public Editions & Download
 
-OmniCapture is distributed as a **zero-install portable Windows application** (no Python or environment setup needed). Every release on GitHub has a unique design and distinct capabilities:
+OmniCapture is maintained in **two distinct public editions** to serve both graphical workflow creators and terminal automation engineers:
 
-| Version | Focus / Identity | Standalone Download | Release Details |
-| :--- | :--- | :--- | :--- |
-| **v1.3.0** *(Latest)* | **Pro Broadcast Studio**: DWM Mica sync, DAW audio mixer with dB scale, Liquid Glass + Light Minimal themes, Command Palette (`Ctrl+P`). | [📥 Download v1.3.0 Portable (.zip)](https://github.com/rajvisual/OmniCapture/releases/download/v1.3.0/OmniCapture-v1.3.0-Windows-x64-Portable.zip) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.3.0) |
-| **v1.2.0** | **Modern GUI Dashboard**: First graphical release with System Tray minimization and global Windows hotkeys (`Ctrl+Alt+D/M/C/R`). | [📥 View v1.2.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.2.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.2.0) |
-| **v1.1.0** | **Dual Recording Engine**: Parallel capture of PC screen and mobile camera into two independent 60 FPS video files. | [📥 View v1.1.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0) |
-| **v1.0.0** | **Stealth Foundation**: Ultra-low-latency Direct3D 11 display mirror and stealth camera stream over interactive CLI. | [📥 View v1.0.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.0.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.0.0) |
+| Edition | Version | Interface | Best For | Requirements | Download & Run |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **OmniCapture Studio** | **v1.4.0** *(Pre-Release)* | **Modern Desktop GUI** | Content creators, educators, and streamers needing live multi-scene viewfinders, audio meters, crash survival, and 1-click recording. | Windows 11 / 10 64-bit<br>• Android phone (USB/Wi-Fi)<br>• FFmpeg installed | [📥 Download v1.4.0 Portable (.zip)](https://github.com/rajvisual/OmniCapture/releases/download/v1.4.0/OmniCapture-Studio-v1.4.0-Windows-x64-Portable.zip)<br>Run `OmniCapture.exe` |
+| **OmniCapture Classic** | **v1.1.0** *(Stable)* | **Terminal / CLI Only** | Developers, automation scripts, minimal headless rigs, and users who prefer a pure terminal menu with zero GUI overhead. | Windows 10 / 11<br>• Python 3.10+ or portable<br>• Android phone | [📥 View v1.1.0 Classic Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0)<br>Run `python omni.py` |
 
-👉 **Read the full [Version Evolution Guide & Feature Matrix](docs/versions.md)** to see which version best matches your setup!
+> [!NOTE]
+> **FFmpeg Requirement for Studio Edition**:
+> Until the standalone installer bundles FFmpeg directly, PC screen capture requires FFmpeg in your system PATH or `bin/` directory. Install it in one command via PowerShell:
+> ```powershell
+> winget install Gyan.FFmpeg
+> ```
+
+---
+
+## 📸 Studio Visual Showcase
+
+> [!TIP]
+> **Live Desktop Screenshot Placement**:
+> Screen captures below are captured directly from real Windows 11 desktop sessions to prevent offscreen PrintWindow artifacts. To generate your own fresh captures from your local monitor:
+> ```powershell
+> python scripts/user_qa_screenshots.py
+> ```
+> *Captured images will be saved directly to `docs/qa_shots/`.*
+
+| Dark Liquid Glass Theme (Default) | Light Minimal Theme (Solid Fluent Light) |
+| :---: | :---: |
+| ![Studio Dark](assets/screenshots/m1_dark_liquid_glass.png) | ![Studio Light](assets/screenshots/m1_light_minimal.png) |
+
+---
+
+## ⌨️ Studio Keyboard Shortcuts & Hotkeys
+
+All hotkeys are scoped cleanly to prevent recording interruptions:
+
+| Shortcut | Scope | Action Performed |
+| :--- | :--- | :--- |
+| **`Ctrl + Alt + D`** | **Global** (System-wide) | Start / Stop Dual Recording (PC Screen + Mobile Camera) |
+| **`Ctrl + Alt + M`** | **Global** (System-wide) | Launch Android Display Mirror with interactive touch control |
+| **`Ctrl + Alt + C`** | **Global** (System-wide) | Launch Camera Viewfinder (Powers off mobile screen for stealth) |
+| **`Ctrl + Alt + R`** | **Global** (System-wide) | Open Recordings folder in Windows Explorer |
+| **`Ctrl + P` / `Ctrl + K`** | In-App | Open Studio Command Palette for fuzzy action navigation |
+| **`1` / `2` / `3` / `4`** | In-App | Switch Active Scene (`Dual`, `Mirror`, `Camera`, `Screen`) *(unfocused)* |
+| **`F5`** | In-App | Refresh connected Android devices & query battery telemetry |
+| **`Ctrl + Shift + L`** | In-App | Release camera sensor hardware lock held by phone background apps |
+| **`Ctrl + ,`** | In-App | Open Studio Preferences Dialog |
+| **`Alt + F / C / T / V / S / H`** | In-App | Windows Standard Menu Mnemonics (`File`, `Capture`, `Tools`, `View`, `Settings`, `Help`) |
+| **`Ctrl + W`** | In-App | Minimize application to Windows System Tray |
+| **`Ctrl + Q`** | In-App | Exit Application *(Prompts confirmation if recording is active)* |
+| **`Escape`** | In-App | Dismiss active menu, palette, or dialog **(NEVER stops recording)** |
 
 ---
 
@@ -308,84 +349,41 @@ OmniCapture loads configuration from `config.json` (template provided in `config
 - Lower the max resolution dimension by setting `"max_size": 1024` or `"video_bit_rate": "6M"` in `config.json`.
 - Avoid USB 2.0 hubs; connect directly to a rear motherboard USB 3.0 port.
 
-### Camera Mode Fails to Start
-- Verify your camera sensor ID by running `python omni.py info`.
-- Make sure no other application on your phone is actively using the camera hardware.
+### Camera Sensor Busy / Hardware Lock
+- If another app on your phone (e.g. Google Camera) holds the Camera2 hardware sensor lock, press **`Ctrl + Shift + L`** in OmniCapture or click **`Release Lock`** on the State Banner. OmniCapture will automatically invoke `am force-stop` on background clients.
 
 For detailed debugging steps, see [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ---
 
-## Project Structure
+## ⚠️ Known Limitations
 
-```text
-OmniCapture/
-│
-├── omni.py                     # Main CLI entrypoint & interactive terminal TUI
-├── omni.bat                    # One-click portable Windows batch launcher
-├── config.json                 # Active user configuration
-├── config.example.json         # Clean configuration template
-├── requirements.txt            # Python dependencies (Google Drive SDK)
-│
-├── core/                       # Core application logic
-│   ├── adb_manager.py          # ADB interface, diagnostics & battery monitor
-│   ├── pc_recorder.py          # Windows PC screen recorder via FFmpeg gdigrab
-│   ├── scrcpy_engine.py        # Process orchestration & flag validation
-│   ├── recorder.py             # Direct-to-PC & dual simultaneous recording
-│   └── drive_uploader.py       # Google Drive Desktop & API v3 uploader
-│
-├── bin/                        # Portable runtime binaries (scrcpy & adb)
-│   ├── adb.exe
-│   ├── scrcpy.exe
-│   └── scrcpy-server
-│
-├── assets/                     # Branding, screenshots & media
-│   ├── logo/                   # SVGs, high-res PNG icons, and .ico
-│   ├── banners/                # 1280x640 social preview banner
-│   └── screenshots/            # Verified application preview cards
-│
-├── docs/                       # Comprehensive documentation suite
-│   ├── installation.md         # Step-by-step beginner guide
-│   ├── configuration.md        # Deep configuration parameter reference
-│   ├── features.md             # In-depth architectural feature manual
-│   ├── troubleshooting.md      # Matrix of known errors and fixes
-│   └── development.md          # Contributing & developer architecture guide
-│
-├── scripts/                    # Automation & QA maintenance tools
-│   ├── setup_environment.bat   # Automated environment & venv installer
-│   ├── run_checks.ps1          # Automated linting & test suite runner
-│   └── generate_branding.ps1   # Native GDI+ branding generator
-│
-├── tests/                      # Automated unit test suite
-│   ├── test_cli.py             # CLI parser verification
-│   ├── test_config.py          # Configuration loading & path validation
-│   ├── test_pc_recorder.py     # PC screen capture & dual filenames verification
-│   └── test_scrcpy_args.py     # Command flag builder & constraint tests
-│
-└── recordings/                 # Default destination for saved MP4/MKV captures
-    └── .gitkeep
-```
+1. **Screen Reader (Windows UI Automation) Boundary**:
+   - Tcl/Tk and CustomTkinter render widgets using internal canvas primitives and do not implement Microsoft UI Automation (UIA) or MSAA providers on Windows.
+   - Windows Narrator cannot inspect inner canvas widgets, sliders, or segmented buttons. OmniCapture provides accessible fallbacks: 100% keyboard operability (Tab order, Space/Enter, arrow keys), visible 2px focus rings, live caption status updates (`WM_SETTEXT`), and native Windows Action Center notifications.
+2. **Frosted Glass Approximation**:
+   - Tk lacks a continuous hardware blur compositor. OmniCapture implements high-performance pre-blurred ambient snapshot slices for popups, which automatically fall back to solid flat surfaces during active recording to eliminate video encoder contention.
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap
 
 - [x] **v1.0.0**: Bundled portable runtime (scrcpy 3.3.4 + ADB).
-- [x] **v1.0.0**: 60 FPS low-latency display mirroring.
-- [x] **v1.0.0**: Direct-to-PC MP4 recording with duration and file-size metrics.
-- [x] **v1.0.0**: Stealth Camera2 API streaming with phone screen sleeping.
-- [x] **v1.0.0**: Linux kernel UHID mouse/keyboard hardware simulation.
-- [x] **v1.0.0**: Hybrid Google Drive cloud sync (Desktop virtual path + REST API v3).
+- [x] **v1.0.0**: 60 FPS low-latency display mirroring & stealth front/back camera streaming.
+- [x] **v1.0.0**: Linux kernel UHID mouse/keyboard hardware simulation (bypasses Xiaomi/POCO locks).
 - [x] **v1.1.0**: Dual simultaneous recording (PC Screen + Mobile Camera saved as 2 separate files).
-- [ ] **v1.2.0** *(Planned)*: System-tray background daemon with global Windows hotkeys.
-- [ ] **v1.3.0** *(Planned)*: Virtual webcam driver integration (OBS / Discord / Zoom direct input).
-- [ ] **v1.4.0** *(Planned)*: Multi-device grid view (control 4+ phones simultaneously).
+- [x] **v1.2.0**: Modern Windows 11 GUI dashboard & system tray background service.
+- [x] **v1.3.0**: Broadcast console with DAW audio mixer and Light/Dark Fluent design tokens.
+- [x] **v1.4.0**: Recording crash-safety (MKV/fragmented MP4), Win32 Job Object process hygiene, 1366x768 adaptive ergonomics, 21-state matrix.
+- [ ] **v1.5.0**: Zero-dependency Inno Setup Windows installer with bundled FFmpeg runtime.
+- [ ] **v2.0.0**: Modernized Qt / WinUI 3 architecture with full native Microsoft UI Automation (UIA) providers.
 
 ---
 
-## License
+## 📜 License & Third-Party Notices
 
-OmniCapture is released under the **Apache License 2.0** (or **MIT License** at the user's discretion). See [LICENSE.md](LICENSE.md) for full license details, terms, and upstream open-source attributions (`scrcpy` by Genymobile).
+OmniCapture is released under the **Apache License 2.0**. See [LICENSE](LICENSE) for full legal text.
+For upstream third-party component licenses and attributions (scrcpy, ADB, CustomTkinter, Pillow, Pystray, FFmpeg), see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 

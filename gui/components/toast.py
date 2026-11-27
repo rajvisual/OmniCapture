@@ -17,7 +17,9 @@ class ToastNotification(ctk.CTkFrame):
         title: str,
         message: str,
         level: str = "info",
-        duration_ms: int = 3000,
+        duration_ms: int = 3500,
+        action_text: Optional[str] = None,
+        action_cmd: Optional[callable] = None,
         on_dismiss: Optional[callable] = None,
         **kwargs
     ):
@@ -31,6 +33,9 @@ class ToastNotification(ctk.CTkFrame):
             **kwargs
         )
 
+        # Rules: Errors persist until user dismisses (duration=0); others auto-dismiss 3.5s
+        if level == "error":
+            duration_ms = 0
         self.duration_ms = duration_ms
         self.on_dismiss = on_dismiss
         self._dismiss_job = None
@@ -96,6 +101,22 @@ class ToastNotification(ctk.CTkFrame):
             )
             msg_lbl.pack(fill="x", pady=(2, 0))
 
+        # Optional action button
+        if action_text and action_cmd:
+            act_btn = ctk.CTkButton(
+                content,
+                text=action_text,
+                height=22,
+                width=72,
+                font=OmniTheme.font_caption(),
+                fg_color=tokens.accent_primary,
+                hover_color=tokens.accent_hover,
+                text_color="#FFFFFF",
+                corner_radius=OmniTheme.RADIUS_CONTROL,
+                command=lambda: [action_cmd(), self.dismiss()]
+            )
+            act_btn.pack(anchor="w", pady=(4, 0))
+
         # Schedule auto-dismiss (strictly 3 seconds by default)
         if duration_ms > 0:
             self._dismiss_job = self.after(duration_ms, self.dismiss)
@@ -127,12 +148,28 @@ class ToastNotificationManager:
         self.root = root_window
         self.active_toasts: List[ToastNotification] = []
 
-    def show(self, title: str, message: str = "", level: str = "info", duration_ms: int = 3000):
-        """Display an in-app non-blocking toast with 3s auto-dismiss."""
+    def show(
+        self,
+        title: str,
+        message: str = "",
+        level: str = "info",
+        duration_ms: int = 3500,
+        action_text: Optional[str] = None,
+        action_cmd: Optional[callable] = None
+    ):
+        """Display an in-app non-blocking toast with 3.5s auto-dismiss (errors persist)."""
         # Ensure executed on the Tkinter GUI thread
-        self.root.after(0, lambda: self._create_toast(title, message, level, duration_ms))
+        self.root.after(0, lambda: self._create_toast(title, message, level, duration_ms, action_text, action_cmd))
 
-    def _create_toast(self, title: str, message: str, level: str, duration_ms: int):
+    def _create_toast(
+        self,
+        title: str,
+        message: str,
+        level: str,
+        duration_ms: int,
+        action_text: Optional[str] = None,
+        action_cmd: Optional[callable] = None
+    ):
         # Limit visible toasts to 3 to prevent clutter
         if len(self.active_toasts) >= 3:
             oldest = self.active_toasts.pop(0)
@@ -144,6 +181,8 @@ class ToastNotificationManager:
             message=message,
             level=level,
             duration_ms=duration_ms,
+            action_text=action_text,
+            action_cmd=action_cmd,
             on_dismiss=self._on_toast_dismissed,
             width=320
         )

@@ -1,0 +1,38 @@
+{
+  "benchmark": "Synthetic lavfi testsrc Encoding Benchmark [NOT VERIFIED AS APP RECORDING]",
+  "verification_status": "NOT VERIFIED — Replaced by interactive suite 'scripts/user_qa_recording.py'",
+  "phone_connected": false,
+  "phone_status": "No device connected via USB; phone camera omitted per protocol",
+  "desktop_capture_session_note": "Synthetic testsrc benchmark; does NOT capture live PC desktop. Real desktop QA requires running scripts/user_qa_recording.py in an interactive desktop session.",
+  "encoder": {
+    "codec": "h264_mf",
+    "display_name": "MediaFoundation (Hardware MFT)",
+    "mapping": "MediaFoundation (Hardware MFT via h264_mf, H264 Encoder MFT)",
+    "command": "ffmpeg.exe -y -f lavfi -i testsrc=duration=60:size=1920x1080:rate=60 -c:v h264_mf -pix_fmt yuv420p recordings/bench_m5_synthetic.mp4"
+  },
+  "ui_cpu_avg_pct": 0.0,
+  "ui_cpu_peak_pct": 0.0,
+  "ui_ram_avg_mb": 18.07,
+  "encoding_wall_time_s": 50.35,
+  "file": {
+    "path": "recordings/bench_m5_synthetic.mp4",
+    "size_mb": 3.54,
+    "probe": {
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1920,
+          "height": 1080,
+          "r_frame_rate": "60/1",
+          "nb_frames": "3600"
+        }
+      ],
+      "format": {
+        "duration": "60.000000",
+        "bit_rate": "494712"
+      }
+    }
+  },
+  "dropped_frames": 0,
+  "timestamp": "2026-11-28 01:32:23"
+}

@@ -58,6 +58,13 @@ def main():
         shutil.copy2(cfg_src, cfg_dst)
         print("  [✓] Default config.json copied to portable bundle")
 
+    # Copy bin/ to top-level so users can drop ffmpeg.exe easily
+    bin_src = BASE_DIR / "bin"
+    bin_dst = DIST_DIR / "bin"
+    if bin_src.exists() and not bin_dst.exists():
+        shutil.copytree(bin_src, bin_dst)
+        print("  [✓] Bundled bin/ runtime copied to portable bundle root")
+
     exe_path = DIST_DIR / "OmniCapture.exe"
     if exe_path.exists():
         size_mb = exe_path.stat().st_size / (1024 * 1024)
@@ -65,7 +72,6 @@ def main():
         print("  ✅ PORTABLE BUNDLE BUILT SUCCESSFULLY!")
         print(f"  Binary Location: {exe_path}")
         print(f"  Executable Size: {size_mb:.2f} MB")
-        print("  Status: Zero-install portable bundle ready for distribution.")
         print("=" * 70 + "\n")
     else:
         print("[!] Warning: OmniCapture.exe was not found in dist directory.")

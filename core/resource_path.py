@@ -70,6 +70,34 @@ def resolve_binary(binary_name: str, preferred_dir: Optional[Path | str] = None)
 
     return None
 
+def get_cache_dir() -> Path:
+    """Get the local cache directory under %LOCALAPPDATA%/OmniCapture/cache."""
+    local = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+    if local:
+        base = Path(local) / "OmniCapture" / "cache"
+    else:
+        base = Path.home() / ".omnicapture" / "cache"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+def get_cached_icon(icon_path: Path, size: tuple[int, int]):
+    """Load pre-scaled icon from disk cache or scale and cache it to eliminate LANCZOS startup latency."""
+    cache_file = get_cache_dir() / f"icon_{size[0]}x{size[1]}_{icon_path.stem}.png"
+    if cache_file.is_file():
+        try:
+            if cache_file.stat().st_mtime >= icon_path.stat().st_mtime:
+                from PIL import Image
+                return Image.open(cache_file)
+        except Exception:
+            pass
+    from PIL import Image
+    img = Image.open(icon_path).resize(size, Image.Resampling.LANCZOS)
+    try:
+        img.save(cache_file, format="PNG")
+    except Exception:
+        pass
+    return img
+
 def get_recordings_dir() -> Path:
     """Get the recordings directory, ensuring it exists."""
     rec_dir = get_base_dir() / "recordings"

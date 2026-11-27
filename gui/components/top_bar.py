@@ -5,6 +5,7 @@ from PIL import Image
 from gui.theme import OmniTheme, ThemeTokens
 from gui.components.menu_dropdown import MenuDropdown
 from core.resource_path import resolve_resource
+from core.version import VERSION
 
 class UnifiedTopBar(ctk.CTkFrame):
     """
@@ -60,7 +61,8 @@ class UnifiedTopBar(ctk.CTkFrame):
         logo_path = resolve_resource("assets/logo/omnicapture-icon.png")
         if logo_path.is_file():
             try:
-                pil_img = Image.open(str(logo_path)).resize((20, 20), Image.Resampling.LANCZOS)
+                from core.resource_path import get_cached_icon
+                pil_img = get_cached_icon(logo_path, (20, 20))
                 self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
                 ctk.CTkLabel(self.left_box, image=self.logo_ctk, text="").pack(side="left", padx=(0, 8))
             except Exception:
@@ -78,11 +80,24 @@ class UnifiedTopBar(ctk.CTkFrame):
         # Version Pill
         self.ver_lbl = ctk.CTkLabel(
             self.left_box,
-            text="v1.3.0",
+            text=f"v{VERSION}",
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
         )
-        self.ver_lbl.pack(side="left", padx=(0, 12))
+        self.ver_lbl.pack(side="left", padx=(0, 8))
+
+        # Simulated Device Mode Indicator Badge (Dev-only, hidden in real hardware mode)
+        self.sim_badge = ctk.CTkLabel(
+            self.left_box,
+            text="SIMULATED DEVICE",
+            font=OmniTheme.font_mono(9),
+            fg_color=tokens.status_warning,
+            text_color="#FFFFFF",
+            corner_radius=4,
+            padx=6,
+            pady=1
+        )
+        # Not packed by default; shown via set_simulated_mode(True)
 
         # In-App Menu Items
         self._build_menu_buttons(self.left_box, tokens)
@@ -253,7 +268,7 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"label": "Camera Sensor Viewfinder", "accelerator": "Ctrl+Alt+C", "command": h.get("launch_camera")},
             {"label": "Mobile Screen Record", "command": h.get("start_screen_record")},
             {"separator": True},
-            {"label": "Stop Active Capture", "accelerator": "Esc", "command": h.get("stop_active_recording")},
+            {"label": "Stop Active Capture", "command": h.get("stop_active_recording")},
         ]
 
     def _get_tools_menu_items(self) -> list:
@@ -266,6 +281,9 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"label": "Refresh Devices", "accelerator": "F5", "command": h.get("refresh_devices")},
             {"separator": True},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
+            {"separator": True},
+            {"label": "Developer: Simulated Device...", "command": h.get("open_simulated_device")},
+            {"label": "Developer: Component Gallery...", "command": h.get("open_gallery")},
         ]
 
     def _get_view_menu_items(self) -> list:
@@ -286,12 +304,16 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"label": "Studio Preferences...", "accelerator": "Ctrl+,", "command": h.get("open_settings")},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
             {"separator": True},
+            {"label": "Developer: Component Gallery...", "command": h.get("open_gallery")},
+            {"separator": True},
             {"label": "Keyboard Shortcuts Guide", "command": h.get("open_hotkeys_guide")},
         ]
 
     def _get_help_menu_items(self) -> list:
         h = self.menu_handlers
         return [
+            {"label": "Getting Started Checklist...", "accelerator": "F1", "command": h.get("open_onboarding")},
+            {"separator": True},
             {"label": "Keyboard Shortcuts", "accelerator": "Ctrl+/", "command": h.get("open_hotkeys_guide")},
             {"label": "Hardware Diagnostics", "command": h.get("open_diagnostics")},
             {"separator": True},
@@ -334,3 +356,12 @@ class UnifiedTopBar(ctk.CTkFrame):
             text_color=tokens.text_muted,
             border_color=tokens.border_subtle
         )
+
+    def set_simulated_mode(self, active: bool):
+        """Toggle prominent developer-only Simulated Device Mode badge."""
+        if active:
+            if not self.sim_badge.winfo_ismapped():
+                self.sim_badge.pack(side="left", padx=(0, 10), after=self.ver_lbl)
+        else:
+            if self.sim_badge.winfo_ismapped():
+                self.sim_badge.pack_forget()

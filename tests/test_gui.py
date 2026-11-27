@@ -147,7 +147,7 @@ class TestGUIComponents(unittest.TestCase):
         self.assertEqual(tokens_dark.name, "dark")
         self.assertTrue(tokens_dark.is_dark)
         self.assertEqual(OmniTheme.BG_ROOT, tokens_dark.bg_root)
-        self.assertIn("rgba", OmniTheme.SURFACE_GLASS)
+        self.assertTrue(OmniTheme.SURFACE_GLASS.startswith("#"))
         self.assertEqual(OmniTheme.BLUR_RADIUS, 28)
         self.assertGreater(OmniTheme.NOISE_OPACITY, 0.0)
 

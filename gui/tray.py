@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw
 
 import pystray
 from core.resource_path import resolve_resource
+from core.version import VERSION, APP_NAME
 
 class SystemTrayManager:
     """
@@ -99,12 +100,12 @@ class SystemTrayManager:
                 if not self._rec_image:
                     self._rec_image = self._load_icon_image(recording=True)
                 self._icon.icon = self._rec_image
-                self._icon.title = f"OmniCapture Studio — REC [{elapsed_str}]"
+                self._icon.title = f"{APP_NAME} v{VERSION} — REC [{elapsed_str}]"
             else:
                 if not self._idle_image:
                     self._idle_image = self._load_icon_image(recording=False)
                 self._icon.icon = self._idle_image
-                self._icon.title = "OmniCapture Studio — Studio Ready"
+                self._icon.title = f"{APP_NAME} v{VERSION} — Studio Ready"
 
             # Re-generate menu with updated Start/Stop label
             self._icon.menu = self._build_menu()
@@ -123,7 +124,7 @@ class SystemTrayManager:
         self._icon = pystray.Icon(
             name="OmniCapture",
             icon=self._idle_image,
-            title="OmniCapture Studio — Studio Ready",
+            title=f"{APP_NAME} v{VERSION} — Studio Ready",
             menu=menu
         )
 

@@ -70,3 +70,9 @@ logs/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# QA Screenshots, Archives and Session Locks
+docs/qa_shots/
+*.sync.json
+.omni_active_recording.json
+*.zip

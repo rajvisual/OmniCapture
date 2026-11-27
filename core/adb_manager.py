@@ -382,6 +382,20 @@ class ADBManager:
             return True, f"Successfully connected wirelessly to {ip}:{port}! You can now unplug USB cable."
         return False, f"Connection attempt output: {out or err}"
 
+    def disable_wireless(self, device_id: Optional[str] = None) -> Tuple[bool, str]:
+        """
+        Switch device from TCP/IP mode back to USB-only mode and disconnect wireless endpoint.
+        """
+        cmd = ["usb"]
+        if device_id:
+            cmd = ["-s", device_id, "usb"]
+        self._run_cmd(cmd)
+        if device_id and ":" in device_id:
+            self._run_cmd(["disconnect", device_id])
+        else:
+            self._run_cmd(["disconnect"])
+        return True, "Switched device to USB-only mode. Wi-Fi ADB disconnected."
+
     def release_camera_lock(self, device_id: Optional[str] = None):
         """
         Force-stop camera apps (MIUI Camera, Google Camera, etc.)

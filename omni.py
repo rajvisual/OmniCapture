@@ -58,12 +58,14 @@ def load_config() -> dict:
             pass
     return default_cfg
 
+from core.version import VERSION
+
 def save_config(cfg: dict):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
 def print_banner():
-    print("OmniCapture 1.2.0")
+    print(f"OmniCapture Studio v{VERSION}")
     print("Android & PC Desktop Capture Suite\n")
 
 def get_system_status(adb: ADBManager, scrcpy: ScrcpyEngine) -> dict:
@@ -514,6 +516,7 @@ def show_diagnostics(adb: ADBManager, scrcpy: ScrcpyEngine, dev_id: Optional[str
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OmniCapture - Display, Stealth Camera & Dual PC Recording Suite")
     parser.add_argument("--gui", action="store_true", help="Launch the modern Windows 11 GUI dashboard")
+    parser.add_argument("--gallery", action="store_true", help="Launch Developer Component Gallery showcase")
     subparsers = parser.add_subparsers(dest="command")
 
     # Command: gui
@@ -584,6 +587,17 @@ def main():
 
     parser = build_parser()
     args = parser.parse_args()
+
+    # If --gallery flag, launch Developer Component Gallery
+    if getattr(args, "gallery", False):
+        import customtkinter as ctk
+        from gui.dialogs.component_gallery import ComponentGalleryWindow
+        app = ctk.CTk()
+        app.withdraw()
+        gallery = ComponentGalleryWindow(app)
+        gallery.protocol("WM_DELETE_WINDOW", lambda: (gallery.destroy(), app.destroy(), sys.exit(0)))
+        app.mainloop()
+        return
 
     # If --gui flag or gui subcommand, launch GUI dashboard
     if getattr(args, "gui", False) or args.command == "gui":

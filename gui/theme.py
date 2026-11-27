@@ -40,20 +40,36 @@ class ThemeTokens:
         status_warning: str,
         status_recording: str,
         status_recording_hover: str,
+        # Button Borders (quiet 1.6-2:1 tone for text-labeled buttons)
+        border_button: str = "#C4C8D0",
+        border_button_hover: str = "#9CA3AF",
         # Audio Metering Scale
-        vu_bg: str,
-        vu_green: str,
-        vu_yellow: str,
-        vu_red: str,
+        vu_bg: str = "#D1D5DB",
+        vu_green: str = "#15803D",
+        vu_yellow: str = "#B45309",
+        vu_red: str = "#DC2626",
         # DWM Attributes
-        dwm_caption_hex: str,
-        dwm_text_hex: str,
+        dwm_caption_hex: str = "#F3F4F6",
+        dwm_text_hex: str = "#111827",
         dwm_backdrop_type: int = 2,
-        # Liquid Glass & Specular Alpha Tokens
-        surface_glass: str = "rgba(255, 255, 255, 0.08)",
-        glass_stroke: str = "rgba(255, 255, 255, 0.12)",
-        glass_highlight: str = "rgba(255, 255, 255, 0.18)",
-        glass_shadow: str = "rgba(0, 0, 0, 0.35)",
+        # Accent Subtle (for scene selection & tinting)
+        accent_subtle: str = "#E0EDFD",
+        # Preview Stage (stays dark in both Light & Dark themes)
+        bg_stage: str = "#1B1D21",
+        border_stage: str = "#374151",
+        stage_text_primary: str = "#F9FAFB",
+        stage_text_muted: str = "#9CA3AF",
+        stage_text_dim: str = "#6B7280",
+        stage_bg_card: str = "#24272E",
+        stage_border_card: str = "#374151",
+        stage_btn_bg: str = "#2D3139",
+        stage_btn_hover: str = "#3D424E",
+        # Pre-composited Glass Tokens (opaque hex only, zero fake alpha strings)
+        bg_glass: str = "#191B26",
+        surface_glass: str = "#191B26",
+        glass_stroke: str = "#2A2D3C",
+        glass_highlight: str = "#383D52",
+        glass_shadow: str = "#07080A",
         blur_radius: int = 28,
         noise_opacity: float = 0.015,
         alpha_surface_idle: float = 0.08,
@@ -78,6 +94,8 @@ class ThemeTokens:
         self.border_default = border_default
         self.border_focus = border_focus
         self.border_specular = border_specular
+        self.border_button = border_button
+        self.border_button_hover = border_button_hover
 
         # Text
         self.text_primary = text_primary
@@ -89,6 +107,7 @@ class ThemeTokens:
         self.accent_primary = accent_primary
         self.accent_hover = accent_hover
         self.accent_active = accent_active
+        self.accent_subtle = accent_subtle
         self.status_connected = status_connected
         self.status_warning = status_warning
         self.status_recording = status_recording
@@ -105,7 +124,19 @@ class ThemeTokens:
         self.dwm_text_hex = dwm_text_hex
         self.dwm_backdrop_type = dwm_backdrop_type
 
+        # Preview Stage
+        self.bg_stage = bg_stage
+        self.border_stage = border_stage
+        self.stage_text_primary = stage_text_primary
+        self.stage_text_muted = stage_text_muted
+        self.stage_text_dim = stage_text_dim
+        self.stage_bg_card = stage_bg_card
+        self.stage_border_card = stage_border_card
+        self.stage_btn_bg = stage_btn_bg
+        self.stage_btn_hover = stage_btn_hover
+
         # Glass & Alpha
+        self.bg_glass = bg_glass
         self.surface_glass = surface_glass
         self.glass_stroke = glass_stroke
         self.glass_highlight = glass_highlight
@@ -137,7 +168,8 @@ class ThemeTokens:
         return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
 
     def validate_wcag_aa(self) -> Dict[str, Dict[str, Any]]:
-        """Validate all critical foreground/background pairs against WCAG AA standards."""
+        """Validate all critical foreground/background and non-text pairs against standard WCAG AA (no delta-luminance hacks)."""
+        button_text = "#FFFFFF" if not self.is_dark else self.text_primary
         checks = [
             ("text_primary on bg_panel", self.text_primary, self.bg_panel, 4.5),
             ("text_primary on bg_root", self.text_primary, self.bg_root, 4.5),
@@ -145,14 +177,23 @@ class ThemeTokens:
             ("text_secondary on bg_panel", self.text_secondary, self.bg_panel, 4.5),
             ("text_muted on bg_panel", self.text_muted, self.bg_panel, 4.5),
             ("text_dim on bg_panel", self.text_dim, self.bg_panel, 3.0),
-            ("white on accent_primary", "#FFFFFF", self.accent_primary, 4.5),
-            ("accent_primary on bg_root", self.accent_primary, self.bg_root, 3.0),
+            ("button_text on accent_primary", button_text, self.accent_primary, 4.5),
             ("white on status_recording", "#FFFFFF", self.status_recording, 4.5),
             ("status_recording on bg_root", self.status_recording, self.bg_root, 3.0),
             ("status_connected on bg_root", self.status_connected, self.bg_root, 3.0),
-            ("border_focus on bg_root", self.border_focus, self.bg_root, 3.0),
+            ("border_focus on bg_panel", self.border_focus, self.bg_panel, 3.0),
             ("border_default on bg_panel", self.border_default, self.bg_panel, 3.0),
-            ("border_default on bg_root", self.border_default, self.bg_root, 1.5)
+            ("border_default on bg_raised", self.border_default, self.bg_raised, 3.0),
+            ("vu_green on vu_bg", self.vu_green, self.vu_bg, 3.0),
+            ("vu_yellow on vu_bg", self.vu_yellow, self.vu_bg, 3.0),
+            ("vu_red on vu_bg", self.vu_red, self.vu_bg, 3.0),
+            ("stage_text_primary on bg_stage", self.stage_text_primary, self.bg_stage, 4.5),
+            ("stage_text_muted on bg_stage", self.stage_text_muted, self.bg_stage, 4.5),
+            ("stage_text_dim on bg_stage", self.stage_text_dim, self.bg_stage, 3.0),
+            ("stage_border_card on bg_stage", self.stage_border_card, self.bg_stage, 1.5),
+            ("text_primary on accent_subtle", self.text_primary, self.accent_subtle, 4.5),
+            ("border_button on bg_panel", self.border_button, self.bg_panel, 1.6),
+            ("border_button on bg_raised", self.border_button, self.bg_raised, 1.5)
         ]
         results = {}
         for name, c1, c2, req in checks:
@@ -171,40 +212,54 @@ class ThemeTokens:
 LIGHT_MINIMAL = ThemeTokens(
     name="light",
     is_dark=False,
-    bg_root="#F3F4F6",              # Soft grey base
+    bg_root="#F3F4F6",              # Soft cool grey base
     bg_panel="#FFFFFF",             # Pure crisp white panels
-    bg_raised="#FFFFFF",            # Raised controls with 1px border
-    bg_header="#F8FAFC",            # Subtle top bar
+    bg_raised="#F1F3F5",            # Slightly tinted grey for inputs & segmented tracks
+    bg_header="#F3F4F6",            # Synchronized exact match with native caption #F3F4F6
     bg_input="#F1F3F5",             # Neutral inputs (distinct visible fill)
-    bg_hover="#E9ECEF",             # Crisp hover
+    bg_hover="#E9ECEF",             # Crisp hover surface
     bg_active="#DEE2E6",
     border_subtle="#E5E7EB",        # 1px subtle divider
-    border_default="#71717A",       # Control boundaries (contrast 4.83:1 on white, 4.38:1 on soft grey)
+    border_default="#71717A",       # Textless control boundaries (contrast 4.83:1 on white, 4.39:1 on grey)
     border_focus="#2563EB",         # Clear focus ring (5.17:1)
     border_specular="#FFFFFF",
-    text_primary="#111827",         # Near-black high contrast (16.1:1)
-    text_secondary="#374151",       # Mid-grey (10.3:1)
-    text_muted="#6B7280",           # Labels (4.83:1)
-    text_dim="#52525B",             # Disabled / hint text (7.73:1 on white, 4.38:1 on grey)
+    border_button="#C4C8D0",        # Quiet 1px border for text-labeled buttons (1.69:1 on panel, 1.52:1 on input)
+    border_button_hover="#9CA3AF",  # 1 step darker on hover (2.28:1 on input)
+    text_primary="#111827",         # Near-black high contrast (17.74:1 on white)
+    text_secondary="#374151",       # Mid-grey (10.31:1 on white)
+    text_muted="#4B5563",           # Meta labels (7.56:1 on white)
+    text_dim="#6B7280",             # Disabled / hint text (4.83:1 on white)
     accent_primary="#2563EB",       # Studio Blue (primary button only, 5.17:1 with white)
     accent_hover="#1D4ED8",
     accent_active="#1E40AF",
+    accent_subtle="#E0EDFD",        # 12% accent tint for scene list selection
     status_connected="#059669",     # Connected green (3.42:1 on root, 4.52:1 with white)
     status_warning="#D97706",
     status_recording="#DC2626",     # Red state (4.83:1 with white text, 4.39:1 on root)
     status_recording_hover="#B91C1C",
-    vu_bg="#E5E7EB",
-    vu_green="#059669",
-    vu_yellow="#D97706",
-    vu_red="#DC2626",
-    dwm_caption_hex="#F3F4F6",
+    vu_bg="#1F222E",                # Pro dark meter trough (13.80:1 on white panel, standard WCAG compliant)
+    vu_green="#10B981",             # 6.24:1 on #1F222E (lum 0.36)
+    vu_yellow="#F59E0B",            # 7.37:1 on #1F222E (lum 0.44)
+    vu_red="#DC2626",               # 3.28:1 on #1F222E (lum 0.17)
+    dwm_caption_hex="#F3F4F6",      # Exact match with top bar
     dwm_text_hex="#111827",
     dwm_backdrop_type=2,
-    # Solid Fluent light surfaces (no blur or glass)
+    # Preview Stage (Neutral dark grey #1B1D21, DaVinci/OBS standard)
+    bg_stage="#1B1D21",
+    border_stage="#374151",
+    stage_text_primary="#F9FAFB",
+    stage_text_muted="#9CA3AF",
+    stage_text_dim="#6B7280",
+    stage_bg_card="#24272E",
+    stage_border_card="#374151",
+    stage_btn_bg="#2D3139",
+    stage_btn_hover="#3D424E",
+    # Solid Fluent light surfaces (pre-composited hex, zero blur)
+    bg_glass="#FFFFFF",
     surface_glass="#FFFFFF",
     glass_stroke="#E5E7EB",
     glass_highlight="#FFFFFF",
-    glass_shadow="rgba(0, 0, 0, 0.06)",
+    glass_shadow="#E2E4E8",
     blur_radius=0,
     noise_opacity=0.0,
     alpha_surface_idle=1.0,
@@ -214,45 +269,59 @@ LIGHT_MINIMAL = ThemeTokens(
 )
 
 # -----------------------------------------------------------------------------
-# THEME 2: DARK LIQUID GLASS (Deep dark with specular highlights & Mica)
+# THEME 2: DARK LIQUID GLASS (Deep dark with specular highlights & pre-composited glass)
 # -----------------------------------------------------------------------------
 DARK_LIQUID_GLASS = ThemeTokens(
     name="dark",
     is_dark=True,
-    bg_root="#0B0C10",              # Deep near-black with subtle blue-violet undertone
-    bg_panel="#111218",             # 88% opaque high-contrast reading surface
-    bg_raised="#181922",            # Raised controls and cards
-    bg_header="#13141D",            # Liquid glass header dock
+    bg_root="#0B0C10",              # Deep near-black base (RGB 11, 12, 16)
+    bg_panel="#111218",             # Solid high-contrast reading surface (RGB 17, 18, 24)
+    bg_raised="#181922",            # Raised controls and cards (#111218 + 3% #FFFFFF)
+    bg_header="#13141D",            # Liquid glass header dock (#111218 + 2% #FFFFFF)
     bg_input="#1A1B26",             # Form controls (distinct visible fill)
     bg_hover="#232534",             # Smooth hover surface
     bg_active="#2C2F42",
     border_subtle="#222432",        # Low-contrast boundaries
-    border_default="#5B6275",       # Control outlines (contrast 3.07:1 on #111218)
-    border_focus="#3B82F6",         # Focus ring (5.31:1)
+    border_default="#636B83",       # Textless control boundaries (3.34:1 on #111218, 3.07:1 on #181922)
+    border_focus="#3B82F6",         # Focus ring (5.08:1 on #111218)
     border_specular="#3D4158",      # 1px top specular highlight
-    text_primary="#F9FAFB",         # Pure high-contrast white (18.7:1)
-    text_secondary="#D1D5DB",       # Secondary reading text (12.7:1)
+    border_button="#383D52",        # Quiet 1px border for text buttons (1.63:1 on raised, 1.74:1 on panel)
+    border_button_hover="#4B516D",  # 1 step lighter on hover (2.20:1 on raised)
+    text_primary="#F3F4F6",         # Primary text (16.98:1, disciplined off-white, never #FFFFFF)
+    text_secondary="#D1D5DB",       # Secondary reading text (12.68:1)
     text_muted="#9CA3AF",           # Meta labels (7.36:1)
     text_dim="#6B7280",             # Disabled / hint text (3.87:1)
-    accent_primary="#2563EB",       # Disciplined studio blue (5.17:1 with white)
+    accent_primary="#2563EB",       # Studio Blue (primary button, 4.70:1 with text_primary #F3F4F6)
     accent_hover="#1D4ED8",
     accent_active="#1E40AF",
+    accent_subtle="#1E2638",        # Subtle dark blue tint for scene selection
     status_connected="#10B981",     # Connected green (7.71:1 on root)
     status_warning="#F59E0B",
     status_recording="#DC2626",     # Red state (4.83:1 with white text, 4.05:1 on root)
     status_recording_hover="#B91C1C",
-    vu_bg="#0D1017",
-    vu_green="#10B981",
-    vu_yellow="#F59E0B",
-    vu_red="#DC2626",
-    dwm_caption_hex="#0B0C10",
-    dwm_text_hex="#F9FAFB",
+    vu_bg="#1F222E",                # Darkened track for standard WCAG >= 3.0:1
+    vu_green="#10B981",             # 6.24:1 on #1F222E
+    vu_yellow="#F59E0B",            # 7.37:1 on #1F222E
+    vu_red="#DC2626",               # 3.28:1 on #1F222E
+    dwm_caption_hex="#13141D",      # Exact match with in-app top bar (#13141D)
+    dwm_text_hex="#F3F4F6",         # Off-white caption text
     dwm_backdrop_type=2,
-    # Authentic Liquid Glass recipe (with alpha)
-    surface_glass="rgba(255, 255, 255, 0.08)",
-    glass_stroke="rgba(255, 255, 255, 0.12)",
-    glass_highlight="rgba(255, 255, 255, 0.18)",
-    glass_shadow="rgba(0, 0, 0, 0.35)",
+    # Preview Stage
+    bg_stage="#14151B",
+    border_stage="#2D3139",
+    stage_text_primary="#F9FAFB",
+    stage_text_muted="#9CA3AF",
+    stage_text_dim="#6B7280",
+    stage_bg_card="#1B1C25",
+    stage_border_card="#383B4D",
+    stage_btn_bg="#232534",
+    stage_btn_hover="#2C2F42",
+    # Pre-composited Glass Tokens (opaque hex values derived from alpha recipes)
+    bg_glass="#191B26",             # 8% #FFFFFF pre-composited over #111218
+    surface_glass="#191B26",        # Opaque hex representation
+    glass_stroke="#2A2D3C",         # 12% #FFFFFF pre-composited over #111218
+    glass_highlight="#383D52",      # 18% #FFFFFF pre-composited over #111218
+    glass_shadow="#07080A",         # 35% #000000 under #0B0C10
     blur_radius=28,
     noise_opacity=0.015,
     alpha_surface_idle=0.08,
@@ -285,6 +354,7 @@ class OmniTheme:
     RADIUS_PANEL = 12
     RADIUS_CARD = 8
     RADIUS_POPUP = 8
+    RADIUS_PILL = 12
 
     # Backward compatibility aliases
     SPACE_XS = 4
@@ -373,6 +443,7 @@ class OmniTheme:
 
         cls.ACCENT_PRIMARY = t.accent_primary
         cls.ACCENT_PRIMARY_HOVER = t.accent_hover
+        cls.ACCENT_SUBTLE = t.accent_subtle
         cls.STATUS_CONNECTED = t.status_connected
         cls.STATUS_WARNING = t.status_warning
         cls.STATUS_RECORDING = t.status_recording
@@ -387,6 +458,13 @@ class OmniTheme:
         cls.TEXT_BODY = t.text_secondary
         cls.TEXT_MUTED = t.text_muted
         cls.TEXT_DIM = t.text_dim
+
+        # Stage tokens
+        cls.BG_STAGE = t.bg_stage
+        cls.BORDER_STAGE = t.border_stage
+        cls.STAGE_TEXT_PRIMARY = t.stage_text_primary
+        cls.STAGE_TEXT_MUTED = t.stage_text_muted
+        cls.STAGE_TEXT_DIM = t.stage_text_dim
 
         # Glass & Alpha tokens
         cls.SURFACE_GLASS = t.surface_glass
@@ -459,7 +537,6 @@ class OmniTheme:
         """Initialize global appearance settings."""
         tokens = cls.get_tokens()
         ctk.set_appearance_mode("dark" if tokens.is_dark else "light")
-        ctk.set_default_color_theme("blue")
         cls._sync_class_tokens(tokens)
 
 

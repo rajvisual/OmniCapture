@@ -63,6 +63,13 @@ class GUIController:
         self._dual_timer_thread: Optional[threading.Thread] = None
         self._dual_stop_event = threading.Event()
 
+    def set_simulated_device_manager(self, sim_adb):
+        """Inject simulated device manager for testing and developer mode."""
+        self.adb = sim_adb
+        self.recorder.adb = sim_adb
+        self._device_cache["device_id"] = None
+        self._device_cache["status"] = "NO DEVICE"
+
     # -------------------------------------------------------------------------
     # Device Poller & State
     # -------------------------------------------------------------------------
@@ -140,12 +147,19 @@ class GUIController:
                 new_state["device_id"] = dev_id
                 new_state["model"] = f"{chosen.get('model', 'Device')} (Offline)"
 
+        state_changed = (
+            self._device_cache is None or
+            self._device_cache.get("status") != new_state.get("status") or
+            self._device_cache.get("device_id") != new_state.get("device_id") or
+            self._device_cache.get("battery", {}).get("level") != new_state.get("battery", {}).get("level")
+        )
         self._device_cache = new_state
-        for cb in self._device_listeners:
-            try:
-                cb(new_state)
-            except Exception:
-                pass
+        if state_changed:
+            for cb in self._device_listeners:
+                try:
+                    cb(new_state)
+                except Exception:
+                    pass
         return new_state
 
     def get_cached_device(self) -> Dict[str, Any]:
@@ -183,9 +197,17 @@ class GUIController:
             self.refresh_device_now()
         return ok, msg
 
+    def switch_to_usb_adb(self, device_id: Optional[str] = None) -> Tuple[bool, str]:
+        """Switch device from TCP/IP Wi-Fi ADB back to USB-only mode."""
+        target = device_id or self.get_target_device_id()
+        ok, msg = self.adb.disable_wireless(target)
+        self.refresh_device_now()
+        return ok, msg
+
     def query_diagnostics(self) -> Dict[str, Any]:
-        """Fetch complete system, binary, and camera diagnostics."""
+        """Fetch complete system, binary, encoder, and camera diagnostics."""
         target = self.get_target_device_id()
+        codec, encoder_display = self.pc_recorder.detect_best_encoder()
         diag = {
             "adb_path": str(self.adb.adb_path),
             "adb_version": self.adb.get_adb_version() or "Not detected",
@@ -194,6 +216,8 @@ class GUIController:
             "ffmpeg_path": str(self.pc_recorder.ffmpeg_path) if self.pc_recorder.ffmpeg_path else "Not found",
             "ffmpeg_version": self.pc_recorder.get_ffmpeg_version() or "Not detected",
             "ffmpeg_available": self.pc_recorder.is_available(),
+            "video_encoder": codec,
+            "video_encoder_display": encoder_display,
             "device_id": target,
             "device_status": self._device_cache.get("status"),
             "cameras_info": "Device not connected",
@@ -206,6 +230,22 @@ class GUIController:
             except Exception as e:
                 diag["cameras_info"] = f"Error querying cameras: {e}"
         return diag
+
+    def get_active_encoder_name(self) -> str:
+        """Friendly name of the detected active hardware video encoder."""
+        return self.pc_recorder.detect_best_encoder()[1]
+
+    def get_active_encoder_short(self) -> str:
+        """Concise acronym for the active encoder for status bar readout."""
+        codec, _ = self.pc_recorder.detect_best_encoder()
+        short_names = {
+            "h264_nvenc": "NVENC",
+            "h264_amf": "AMD AMF",
+            "h264_qsv": "Intel QSV",
+            "h264_mf": "MediaFoundation",
+            "libx264": "x264 CPU"
+        }
+        return short_names.get(codec, codec.upper())
 
     # -------------------------------------------------------------------------
     # Single Stream Launchers (Mirror, Camera, Direct Record)
@@ -415,6 +455,7 @@ class GUIController:
         cam_log_file = open(cam_log_path, "w", encoding="utf-8", errors="replace")
 
         # Launch scrcpy camera
+        cam_start_ns = time.perf_counter_ns()
         try:
             cam_proc = subprocess.Popen(
                 cam_cmd,
@@ -427,13 +468,34 @@ class GUIController:
             return False, f"Failed to start mobile camera process: {e}"
 
         # Launch PC screen recorder
+        pc_start_ns = time.perf_counter_ns()
         try:
-            pc_proc, pc_log_file = self.pc_recorder.start_recording(pc_file, fps=pc_fps)
+            pc_proc, pc_log_file = self.pc_recorder.start_recording(
+                pc_file, fps=pc_fps, phone_file=cam_file
+            )
         except Exception as e:
             if cam_proc.poll() is None:
                 cam_proc.terminate()
             cam_log_file.close()
             return False, f"Failed to start PC screen recording: {e}"
+
+        # Assign child processes to Win32 Job Object for process hygiene (zero orphans on crash/close)
+        try:
+            from core.process_job import ProcessJobManager
+            pjm = ProcessJobManager.get_instance()
+            pjm.assign_process(cam_proc)
+            pjm.assign_process(pc_proc)
+        except Exception:
+            pass
+
+        # Write timeline editor sync sidecar file
+        try:
+            is_sim = hasattr(self, "simulated_engine") and self.simulated_engine is not None
+            self.pc_recorder.generate_sync_sidecar(
+                pc_file, cam_file, pc_start_ns, cam_start_ns, is_simulated=is_sim
+            )
+        except Exception:
+            pass
 
         # Healthcheck (wait 1.2s to confirm neither crashed on startup)
         time.sleep(1.2)
@@ -466,6 +528,7 @@ class GUIController:
         start_time = time.time()
         self._dual_recording_active = True
         self._dual_stop_event.clear()
+        self._disk_critical_stopped = False
         self._dual_rec_data = {
             "pc_proc": pc_proc,
             "pc_log_file": pc_log_file,
@@ -478,20 +541,29 @@ class GUIController:
             "on_complete": on_complete
         }
 
-        # Background ticker thread
+        # Background ticker & safety monitor thread
         def _ticker():
+            stop_bytes = int(self.config.get("disk_stop_mb", 500)) * 1024 * 1024
             while self._dual_recording_active and not self._dual_stop_event.is_set():
                 elapsed = time.time() - start_time
                 pc_sz = pc_file.stat().st_size if pc_file.exists() else 0
                 cam_sz = cam_file.stat().st_size if cam_file.exists() else 0
+
+                # Continuous disk safety threshold monitor
+                free_bytes = self.pc_recorder.get_disk_free_bytes(self.recordings_dir)
+                if free_bytes < stop_bytes:
+                    self._disk_critical_stopped = True
+                    self.stop_dual_recording()
+                    break
+
                 if on_tick:
                     try:
                         on_tick(elapsed, pc_sz, cam_sz)
                     except Exception:
                         pass
-                # Also check if mobile window was closed by user
+                # Check if mobile device was unplugged or camera window closed
                 if cam_proc.poll() is not None:
-                    # User closed the camera window -> auto stop
+                    # Finalize recording safely so PC file is not lost
                     self.stop_dual_recording()
                     break
                 time.sleep(0.5)
@@ -585,40 +657,45 @@ class GUIController:
     # -------------------------------------------------------------------------
 
     def get_recordings_list(self) -> List[Dict[str, Any]]:
-        """Return list of valid recording files sorted newest first."""
+        """Return list of valid recording files sorted newest first using fast os.scandir."""
         items = []
-        if not self.recordings_dir.exists():
+        rec_dir_str = str(self.recordings_dir)
+        if not os.path.exists(rec_dir_str):
             return items
 
-        for p in self.recordings_dir.iterdir():
-            if p.is_file() and p.suffix.lower() in (".mp4", ".mkv"):
-                try:
-                    stat = p.stat()
-                    if stat.st_size == 0:
-                        continue
-                    mtime = stat.st_mtime
-                    mtime_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
-                    size_str = self.recorder.format_size(stat.st_size)
+        try:
+            with os.scandir(rec_dir_str) as entries:
+                for entry in entries:
+                    if entry.is_file() and entry.name.lower().endswith((".mp4", ".mkv")):
+                        try:
+                            stat = entry.stat()
+                            if stat.st_size == 0:
+                                continue
+                            mtime = stat.st_mtime
+                            mtime_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
+                            size_str = self.recorder.format_size(stat.st_size)
 
-                    tag = "Recording"
-                    if "REC_PC_SCREEN" in p.name:
-                        tag = "PC Screen"
-                    elif "REC_MOBILE_CAMERA" in p.name:
-                        tag = "Mobile Camera"
-                    elif "REC_MOBILE_SCREEN" in p.name:
-                        tag = "Mobile Screen"
+                            tag = "Recording"
+                            if "REC_PC_SCREEN" in entry.name:
+                                tag = "PC Screen"
+                            elif "REC_MOBILE_CAMERA" in entry.name:
+                                tag = "Mobile Camera"
+                            elif "REC_MOBILE_SCREEN" in entry.name:
+                                tag = "Mobile Screen"
 
-                    items.append({
-                        "name": p.name,
-                        "path": p,
-                        "tag": tag,
-                        "size": stat.st_size,
-                        "size_str": size_str,
-                        "mtime": mtime,
-                        "mtime_str": mtime_str
-                    })
-                except Exception:
-                    pass
+                            items.append({
+                                "name": entry.name,
+                                "path": Path(entry.path),
+                                "tag": tag,
+                                "size": stat.st_size,
+                                "size_str": size_str,
+                                "mtime": mtime,
+                                "mtime_str": mtime_str
+                            })
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
         items.sort(key=lambda x: x["mtime"], reverse=True)
         return items

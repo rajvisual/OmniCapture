@@ -41,10 +41,10 @@ OmniCapture Studio is built on a decoupled, asynchronous Python desktop architec
 
 ### Core Subsystems:
 1. **Frontend UI Engine**: CustomTkinter enhanced with `ctypes.windll.dwmapi` for native Windows 11 DWM titlebar color synchronization, rounded corners (`DWMWCP_ROUND`), and Mica backdrops.
-2. **`ScrcpyEngine` ([`core/scrcpy_engine.py`](file:///E:/github%20projects/OmniCapture/core/scrcpy_engine.py))**: Handles low-latency Direct3D 11 mobile display streaming, raw Android Camera2 sensor captures (with mobile screen powered off), and kernel-level `/dev/uhid` mouse touch emulation.
-3. **`PCRecorder` ([`core/pc_recorder.py`](file:///E:/github%20projects/OmniCapture/core/pc_recorder.py))**: Manages multi-threaded FFmpeg DirectShow and GDI screen captures synchronized at 30 or 60 FPS.
-4. **`ADBManager` ([`core/adb_manager.py`](file:///E:/github%20projects/OmniCapture/core/adb_manager.py))**: Asynchronous hardware poller tracking USB attachments, battery levels, Wi-Fi IP discovery, TCP/IP 5555 switching, and automated Camera2 sensor lock release.
-5. **`DriveUploader` ([`core/drive_uploader.py`](file:///E:/github%20projects/OmniCapture/core/drive_uploader.py))**: Zero-overhead local filesystem synchronization to Google Drive for Desktop virtual paths (`G:\My Drive\OmniCapture`) with automatic fallback to OAuth2 Google Drive REST API v3 chunked uploads.
+2. **`ScrcpyEngine` ([`core/scrcpy_engine.py`](../core/scrcpy_engine.py))**: Handles low-latency Direct3D 11 mobile display streaming, raw Android Camera2 sensor captures (with mobile screen powered off), and kernel-level `/dev/uhid` mouse touch emulation.
+3. **`PCRecorder` ([`core/pc_recorder.py`](../core/pc_recorder.py))**: Manages multi-threaded FFmpeg DirectShow and GDI screen captures synchronized at 30 or 60 FPS.
+4. **`ADBManager` ([`core/adb_manager.py`](../core/adb_manager.py))**: Asynchronous hardware poller tracking USB attachments, battery levels, Wi-Fi IP discovery, TCP/IP 5555 switching, and automated Camera2 sensor lock release.
+5. **`DriveUploader` ([`core/drive_uploader.py`](../core/drive_uploader.py))**: Zero-overhead local filesystem synchronization to Google Drive for Desktop virtual paths (`G:\My Drive\OmniCapture`) with automatic fallback to OAuth2 Google Drive REST API v3 chunked uploads.
 
 ---
 
@@ -122,7 +122,7 @@ OmniCapture Studio is built on a decoupled, asynchronous Python desktop architec
 
 OmniCapture Studio strictly adheres to a **4px grid spacing system**, a **3-tier surface hierarchy**, and **WCAG AA contrast ratios (>= 4.5:1)**.
 
-### Design Token Specification ([`gui/theme.py`](file:///E:/github%20projects/OmniCapture/gui/theme.py))
+### Design Token Specification ([`gui/theme.py`](../gui/theme.py))
 
 | Token Name | Light Minimal | Dark Liquid Glass | Description & Purpose |
 | :--- | :--- | :--- | :--- |
@@ -178,7 +178,7 @@ OmniCapture Studio provides full keyboard accessibility:
 
 ## 6. Dialog Subsystems
 
-### 1. Media Library & Recordings Gallery ([`gui/dialogs/recordings.py`](file:///E:/github%20projects/OmniCapture/gui/dialogs/recordings.py))
+### 1. Media Library & Recordings Gallery ([`gui/dialogs/recordings.py`](../gui/dialogs/recordings.py))
 * Instant search filter for recordings by filename or mode tag (`DUAL_PC`, `DUAL_CAM`, `SCREEN`, `CAMERA`).
 * Real-time calculation of total stored video size.
 * Actions per recording:
@@ -187,13 +187,13 @@ OmniCapture Studio provides full keyboard accessibility:
   * `Upload`: Triggers instant Google Drive cloud sync.
   * `Delete`: Prompts confirmation dialog to safely remove media.
 
-### 2. Studio Preferences ([`gui/dialogs/settings.py`](file:///E:/github%20projects/OmniCapture/gui/dialogs/settings.py))
+### 2. Studio Preferences ([`gui/dialogs/settings.py`](../gui/dialogs/settings.py))
 * **Capture Defaults**: Set default video container (`MP4` / `MKV`) and target FPS (`30` / `60`).
 * **Output Storage**: Native Windows folder picker (`filedialog.askdirectory()`) to customize where video files are saved.
 * **Appearance**: Switch between `Dark Liquid Glass` and `Light Minimal` themes.
 * **System Integration**: Toggles for minimizing to tray on close and enabling global system hotkeys.
 
-### 3. System & Hardware Diagnostics ([`gui/dialogs/diagnostics.py`](file:///E:/github%20projects/OmniCapture/gui/dialogs/diagnostics.py))
+### 3. System & Hardware Diagnostics ([`gui/dialogs/diagnostics.py`](../gui/dialogs/diagnostics.py))
 * **Binary Telemetry**: Inspects ADB, Scrcpy, and FFmpeg installation paths, versions, and hardware acceleration status.
 * **Device Telemetry**: Inspects serial IDs, battery levels, and Wi-Fi IP.
 * **Camera2 Sensor Explorer**: Dumps raw hardware camera characteristics, supported resolutions, and frame rates.

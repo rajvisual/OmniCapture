@@ -30,6 +30,10 @@ hiddenimports = [
     "customtkinter",
     "googleapiclient",
     "google_auth_oauthlib",
+    "core.version",
+    "core.process_job",
+    "core.accessibility",
+    "core.simulated_device",
     "gui.dwm",
     "gui.components",
     "gui.components.audio_meter",
@@ -39,10 +43,15 @@ hiddenimports = [
     "gui.components.empty_state",
     "gui.components.menu_dropdown",
     "gui.components.top_bar",
+    "gui.components.state_banner",
+    "gui.components.frosted_glass",
+    "gui.components.segmented_control",
     "gui.dialogs",
     "gui.dialogs.recordings",
     "gui.dialogs.settings",
     "gui.dialogs.diagnostics",
+    "gui.dialogs.onboarding",
+    "gui.dialogs.simulated_device",
     "gui.menu_bar",
 ] + ctk_hiddenimports
 
@@ -80,6 +89,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    version=str(BASE_DIR / "file_version_info.txt"),
     icon=str(BASE_DIR / "assets" / "logo" / "omnicapture.ico"),
 )
 

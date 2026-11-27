@@ -23,9 +23,9 @@ class CanvasEmptyState(ctk.CTkFrame):
         tokens = OmniTheme.get_tokens()
         super().__init__(
             parent,
-            fg_color=tokens.bg_raised,
+            fg_color=tokens.stage_bg_card,
             border_width=1,
-            border_color=tokens.border_subtle,
+            border_color=tokens.stage_border_card,
             corner_radius=OmniTheme.RADIUS_CARD,
             **kwargs
         )
@@ -43,16 +43,16 @@ class CanvasEmptyState(ctk.CTkFrame):
             inner,
             text="📱",
             font=ctk.CTkFont(size=32),
-            text_color=tokens.text_dim
+            text_color=tokens.stage_text_dim
         )
         self.icon_lbl.pack(pady=(0, 6))
 
-        # Primary Guidance
+        # Primary Guidance (light-on-dark token pair on stage)
         self.title_lbl = ctk.CTkLabel(
             inner,
             text="Connect a phone via USB to start",
             font=OmniTheme.font_section(),
-            text_color=tokens.text_primary
+            text_color=tokens.stage_text_primary
         )
         self.title_lbl.pack(pady=(0, 4))
 
@@ -61,12 +61,12 @@ class CanvasEmptyState(ctk.CTkFrame):
             inner,
             text="Enable USB Debugging on your Android device to stream\nlow-latency screen mirror or raw camera sensor feeds.",
             font=OmniTheme.font_caption(),
-            text_color=tokens.text_muted,
+            text_color=tokens.stage_text_muted,
             justify="center"
         )
         self.desc_lbl.pack(pady=(0, 14))
 
-        # Secondary Action Buttons
+        # Secondary Action Buttons (Stage dark controls)
         btn_box = ctk.CTkFrame(inner, fg_color="transparent")
         btn_box.pack()
 
@@ -76,11 +76,11 @@ class CanvasEmptyState(ctk.CTkFrame):
             width=130,
             height=OmniTheme.CONTROL_HEIGHT,
             font=OmniTheme.font_body(),
-            fg_color=tokens.bg_input,
-            hover_color=tokens.bg_hover,
-            text_color=tokens.text_primary,
+            fg_color=tokens.stage_btn_bg,
+            hover_color=tokens.stage_btn_hover,
+            text_color=tokens.stage_text_primary,
             border_width=1,
-            border_color=tokens.border_default,
+            border_color=tokens.stage_border_card,
             corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self.on_refresh
         )
@@ -94,10 +94,10 @@ class CanvasEmptyState(ctk.CTkFrame):
                 height=OmniTheme.CONTROL_HEIGHT,
                 font=OmniTheme.font_body(),
                 fg_color="transparent",
-                hover_color=tokens.bg_hover,
-                text_color=tokens.text_muted,
+                hover_color=tokens.stage_btn_bg,
+                text_color=tokens.stage_text_muted,
                 border_width=1,
-                border_color=tokens.border_subtle,
+                border_color=tokens.stage_border_card,
                 corner_radius=OmniTheme.RADIUS_CONTROL,
                 command=self.on_diagnostics
             )
@@ -105,21 +105,21 @@ class CanvasEmptyState(ctk.CTkFrame):
 
     def apply_tokens(self, tokens: ThemeTokens):
         self.configure(
-            fg_color=tokens.bg_raised,
-            border_color=tokens.border_subtle
+            fg_color=tokens.stage_bg_card,
+            border_color=tokens.stage_border_card
         )
-        self.icon_lbl.configure(text_color=tokens.text_dim)
-        self.title_lbl.configure(text_color=tokens.text_primary)
-        self.desc_lbl.configure(text_color=tokens.text_muted)
+        self.icon_lbl.configure(text_color=tokens.stage_text_dim)
+        self.title_lbl.configure(text_color=tokens.stage_text_primary)
+        self.desc_lbl.configure(text_color=tokens.stage_text_muted)
         self.btn_refresh.configure(
-            fg_color=tokens.bg_input,
-            hover_color=tokens.bg_hover,
-            text_color=tokens.text_primary,
-            border_color=tokens.border_default
+            fg_color=tokens.stage_btn_bg,
+            hover_color=tokens.stage_btn_hover,
+            text_color=tokens.stage_text_primary,
+            border_color=tokens.stage_border_card
         )
         if hasattr(self, "btn_diag"):
             self.btn_diag.configure(
-                hover_color=tokens.bg_hover,
-                text_color=tokens.text_muted,
-                border_color=tokens.border_subtle
+                hover_color=tokens.stage_btn_bg,
+                text_color=tokens.stage_text_muted,
+                border_color=tokens.stage_border_card
             )

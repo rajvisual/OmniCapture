@@ -7,6 +7,7 @@ class StatusChip(ctk.CTkFrame):
     """
     Fluent Windows 11 Status Chip.
     Displays an operational status dot, concise label, and optional telemetry reading.
+    Supported states: 'ready', 'recording', 'warning', 'connected', 'uploading', 'disconnected', 'error'.
     Respects theme tokens without hardcoded colors.
     """
 
@@ -14,7 +15,7 @@ class StatusChip(ctk.CTkFrame):
         self,
         parent,
         text: str = "Studio Ready",
-        state: str = "ready", # "ready" | "recording" | "warning" | "connected" | "disconnected"
+        state: str = "ready",
         **kwargs
     ):
         tokens = OmniTheme.get_tokens()
@@ -51,11 +52,11 @@ class StatusChip(ctk.CTkFrame):
         self.label.pack(side="left", padx=(0, 10))
 
     def _get_dot_color(self, tokens: ThemeTokens, state: str) -> str:
-        if state == "recording":
+        if state == "recording" or state == "error":
             return tokens.status_recording
         elif state == "connected" or state == "ready":
             return tokens.status_connected
-        elif state == "warning":
+        elif state == "warning" or state == "uploading":
             return tokens.status_warning
         else:
             return tokens.text_dim
