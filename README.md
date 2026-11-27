@@ -6,6 +6,7 @@
 
   **A high-performance Windows toolkit for Android screen mirroring, stealth camera capture, direct-to-PC recording, and cloud synchronization.**
 
+  [![Latest Release](https://img.shields.io/github/v/release/rajvisual/OmniCapture?color=00d2ff&logo=github&label=Release)](https://github.com/rajvisual/OmniCapture/releases/latest)
   [![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-00d2ff?logo=python&logoColor=white)](https://python.org)
   [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0066ff?logo=windows&logoColor=white)](https://microsoft.com/windows)
   [![Scrcpy Engine](https://img.shields.io/badge/scrcpy%20core-v3.3.4-00d2ff?logo=android&logoColor=white)](https://github.com/Genymobile/scrcpy)
@@ -20,6 +21,21 @@
 
 ---
 
+## ⚡ Quick Download & Version Selection
+
+OmniCapture is distributed as a **zero-install portable Windows application** (no Python or environment setup needed). Every release on GitHub has a unique design and distinct capabilities:
+
+| Version | Focus / Identity | Standalone Download | Release Details |
+| :--- | :--- | :--- | :--- |
+| **v1.3.0** *(Latest)* | **Pro Broadcast Studio**: DWM Mica sync, DAW audio mixer with dB scale, Liquid Glass + Light Minimal themes, Command Palette (`Ctrl+P`). | [📥 Download v1.3.0 Portable (.zip)](https://github.com/rajvisual/OmniCapture/releases/download/v1.3.0/OmniCapture-v1.3.0-Windows-x64-Portable.zip) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.3.0) |
+| **v1.2.0** | **Modern GUI Dashboard**: First graphical release with System Tray minimization and global Windows hotkeys (`Ctrl+Alt+D/M/C/R`). | [📥 View v1.2.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.2.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.2.0) |
+| **v1.1.0** | **Dual Recording Engine**: Parallel capture of PC screen and mobile camera into two independent 60 FPS video files. | [📥 View v1.1.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0) |
+| **v1.0.0** | **Stealth Foundation**: Ultra-low-latency Direct3D 11 display mirror and stealth camera stream over interactive CLI. | [📥 View v1.0.0 Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.0.0) | [Release Notes](https://github.com/rajvisual/OmniCapture/releases/tag/v1.0.0) |
+
+👉 **Read the full [Version Evolution Guide & Feature Matrix](docs/versions.md)** to see which version best matches your setup!
+
+---
+
 ## Overview
 
 **OmniCapture** is an open-source, portable Windows desktop suite that transforms any modern Android device into a low-latency secondary display, remote camera viewfinder, or live capture source without installing mobile companion apps or granting root access.
@@ -31,6 +47,11 @@ Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge 
 ## Visual Showcase
 
 <div align="center">
+
+### OmniCapture Studio v1.3.0 (Windows 11 Broadcast Workstation)
+| Dark Liquid Glass Theme (Mica & Specular Alpha) | Light Minimal Theme (Solid Fluent Light) |
+| :---: | :---: |
+| <img src="assets/screenshots/m1_dark_liquid_glass.png" width="480" alt="Dark Liquid Glass Studio" /> | <img src="assets/screenshots/m1_light_minimal.png" width="480" alt="Light Minimal Studio" /> |
 
 ### Interactive Terminal Dashboard & Diagnostics
 | Terminal Interactive Dashboard | Camera2 API Hardware Diagnostics |

@@ -1,0 +1,62 @@
+name: Build & Release Portable Windows Bundle
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Standalone Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Test Suite
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Build PyInstaller Standalone Bundle
+        run: |
+          python scripts/build_standalone.py
+
+      - name: Package Portable ZIP Archive & Checksums
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zipName = "OmniCapture-$tag-Windows-x64-Portable.zip"
+          $zipPath = "dist\$zipName"
+          Write-Host "Creating archive: $zipName..."
+          Compress-Archive -Path "dist\OmniCapture\*" -DestinationPath $zipPath -CompressionLevel Optimal
+          
+          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+          $checksumLine = "$hash  $zipName"
+          Set-Content -Path "dist\SHA256SUMS.txt" -Value $checksumLine
+          Write-Host "SHA256: $checksumLine"
+
+      - name: Publish Release Assets to GitHub
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            dist/OmniCapture-*-Windows-x64-Portable.zip
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
