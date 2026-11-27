@@ -15,7 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added CLI command `python omni.py dual-record` with `--facing`, `--pc-fps`, `--camera-fps`, `--format`, `--no-camera-playback`, and `--upload` arguments.
   - Added option `[7]` to interactive terminal dashboard menu for one-click setup.
   - Automated dual upload: automatically queues both separate recording files to Google Drive when cloud sync is enabled.
+- **Hardware Preflight Verification & Healthchecks**:
+  - Added strict preflight diagnostic guards ensuring ADB devices are connected and authorized before initiating mobile capture.
+  - Independent stream status reporting (`SUCCESS`, `PARTIAL SUCCESS`, `FAILED`) to prevent false dual-recording success claims.
+  - Added automatic camera sensor lock release to close conflicting background camera apps on phone before capture.
 - **Unit Tests**:
+  - Added `tests/test_audit_and_verification.py` verifying device preflight states, error handling, and 0-byte file cleanup.
   - Added `tests/test_pc_recorder.py` validating FFmpeg command flag construction and dual filename generation.
   - Extended `tests/test_cli.py` to cover `dual-record` and `record dual`.
 

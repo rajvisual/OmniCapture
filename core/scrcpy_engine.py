@@ -23,6 +23,20 @@ class ScrcpyEngine:
                 return candidate
         return Path("scrcpy.exe")
 
+    def get_scrcpy_env(self, adb_path: Optional[Path | str] = None) -> Dict[str, str]:
+        """
+        Create environment dictionary for scrcpy process.
+        Sets 'ADB' variable to guarantee scrcpy uses the exact intended adb binary.
+        """
+        env = os.environ.copy()
+        if adb_path and Path(adb_path).is_file():
+            env["ADB"] = str(Path(adb_path).resolve())
+        else:
+            local_adb = self.scrcpy_path.parent / "adb.exe"
+            if local_adb.is_file():
+                env["ADB"] = str(local_adb.resolve())
+        return env
+
     def build_command(self, mode: str, opts: Dict[str, Any]) -> List[str]:
         """
         Build command-line arguments for scrcpy execution based on mode and options.
@@ -63,11 +77,14 @@ class ScrcpyEngine:
 
             # Camera audio is best captured from microphone
             audio_source = opts.get("audio_source", "mic")
-            cmd.append(f"--audio-source={audio_source}")
+            if audio_source and str(audio_source).lower() != "none":
+                cmd.append(f"--audio-source={audio_source}")
+            else:
+                cmd.append("--no-audio")
         else:
             # Display mode audio (disable in live mirror on Android <= 12 to prevent codec errors)
             audio_source = opts.get("audio_source")
-            if audio_source and audio_source != "none" and opts.get("record_file"):
+            if audio_source and str(audio_source).lower() != "none" and opts.get("record_file"):
                 cmd.append(f"--audio-source={audio_source}")
             elif not opts.get("record_file"):
                 cmd.append("--no-audio")
@@ -119,15 +136,16 @@ class ScrcpyEngine:
 
         return cmd
 
-    def run_live(self, cmd: List[str]) -> Tuple[int, float]:
+    def run_live(self, cmd: List[str], env: Optional[Dict[str, str]] = None) -> Tuple[int, float]:
         """
         Run scrcpy process live in terminal.
         Returns (exit_code, duration_seconds).
         """
         start_time = time.time()
+        process_env = env or self.get_scrcpy_env()
         try:
             # Run directly connected to terminal so keyboard/mouse forwarding works
-            proc = subprocess.Popen(cmd)
+            proc = subprocess.Popen(cmd, env=process_env)
             proc.wait()
             duration = time.time() - start_time
             return proc.returncode, duration
@@ -144,7 +162,15 @@ class ScrcpyEngine:
         if device_id:
             cmd.extend(["-s", device_id])
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                encoding="utf-8",
+                errors="replace",
+                env=self.get_scrcpy_env()
+            )
             return res.stdout or res.stderr
         except Exception as e:
             return f"Error listing cameras: {e}"
@@ -155,7 +181,15 @@ class ScrcpyEngine:
         if device_id:
             cmd.extend(["-s", device_id])
         try:
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10, encoding="utf-8", errors="replace")
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                encoding="utf-8",
+                errors="replace",
+                env=self.get_scrcpy_env()
+            )
             return res.stdout or res.stderr
         except Exception as e:
             return f"Error listing camera sizes: {e}"

@@ -65,14 +65,22 @@ python -m venv .venv
 > Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 > ```
 
-### Step 3: Install Dependencies
+### Step 3: Optional Dependencies & Tools
 
-For standard screen mirroring, remote control, and Google Drive for Desktop sync, **no external Python packages are required** (uses Python's standard library).
+1. **For Core Functionality**:
+   OmniCapture includes bundled portable `adb` and `scrcpy` runtimes in `bin/`. **No external tools are required for Android mirroring or recording.**
 
-If you plan to use direct Google Drive REST API OAuth cloud uploads:
-```powershell
-pip install -r requirements.txt
-```
+2. **For PC Desktop Screen Recording (Dual Capture)**:
+   PC screen capture utilizes FFmpeg. If FFmpeg is not already installed on your PC, install it via Windows Package Manager:
+   ```powershell
+   winget install Gyan.FFmpeg
+   ```
+   *(Or place `ffmpeg.exe` directly into the `bin/` directory).*
+
+3. **For Google Drive REST API OAuth Cloud Uploads**:
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
 ---
 

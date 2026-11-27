@@ -22,9 +22,9 @@
 
 ## Overview
 
-**OmniCapture** is an open-source, portable Windows desktop suite that transforms any modern Android device into a low-latency secondary display, high-definition webcam, or live capture source without installing mobile companion apps or granting root access.
+**OmniCapture** is an open-source, portable Windows desktop suite that transforms any modern Android device into a low-latency secondary display, remote camera viewfinder, or live capture source without installing mobile companion apps or granting root access.
 
-Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge (`adb`) runtime, OmniCapture optimizes video pipelines for ultra-low latency (<25ms) at 60 FPS. It features a direct-to-NVMe recording pipeline that bypasses mobile storage constraints, stealth camera streaming that powers down the phone's physical display during operation, Linux kernel UHID hardware mouse emulation, and hybrid Google Drive synchronization.
+Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge (`adb`) runtime, OmniCapture optimizes video pipelines for ultra-low latency (<25ms) at 60 FPS. It features a direct-to-NVMe recording pipeline that bypasses mobile storage constraints, stealth camera streaming that powers down the phone's physical display during operation, Linux kernel UHID hardware mouse emulation, simultaneous PC + mobile dual recording, and hybrid Google Drive synchronization.
 
 ---
 

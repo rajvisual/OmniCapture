@@ -1,18 +1,13 @@
-#!/usr/bin/env python3
-"""
-=============================================================================
-  OmniCapture CLI - Ultimate Display & Stealth Camera Capture Suite
-  Engineered on top of scrcpy 3.3.4 & ADB
-=============================================================================
-"""
-
 import os
 import sys
 import json
+import time
 import argparse
+import subprocess
 from pathlib import Path
+from typing import Optional, Dict, Any, Tuple
 
-# Ensure UTF-8 console output on Windows
+# Enable UTF-8 encoding on Windows terminal
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -33,8 +28,8 @@ CONFIG_PATH = BASE_DIR / "config.json"
 
 def load_config() -> dict:
     default_cfg = {
-        "scrcpy_dir": str(BASE_DIR / "bin"),
-        "recordings_dir": str(BASE_DIR / "recordings"),
+        "scrcpy_dir": "bin",
+        "recordings_dir": "recordings",
         "default_record_format": "mp4",
         "default_camera_facing": "back",
         "default_camera_fps": 30,
@@ -46,7 +41,7 @@ def load_config() -> dict:
         "stay_awake": False,
         "audio_source": "mic",
         "google_drive": {
-            "enabled": True,
+            "enabled": False,
             "method": "desktop",
             "folder_id": "",
             "credentials_file": "client_secrets.json",
@@ -69,13 +64,13 @@ def save_config(cfg: dict):
 
 def print_banner():
     banner = r"""
- [1;36m  ██████╗ ███╗   ███╗███╗   ██╗██╗ ██████╗ █████╗ ██████╗ ████████╗██╗   ██╗██████╗ ███████╗
- ██╔═══██╗████╗ ████║████╗  ██║██║██╔════╝██╔══██╗██╔══██╗╚══██╔══╝██║   ██║██╔══██╗██╔════╝
- ██║   ██║██╔████╔██║██╔██╗ ██║██║██║     ███████║██████╔╝   ██║   ██║   ██║██████╔╝█████╗  
- ██║   ██║██║╚██╔╝██║██║╚██╗██║██║██║     ██╔══██║██╔═══╝    ██║   ██║   ██║██╔══██╗██╔══╝  
- ╚██████╔╝██║ ╚═╝ ██║██║ ╚████║██║╚██████╗██║  ██║██║        ██║   ╚██████╔╝██║  ██║███████╗
-  ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚══════╝ [0m
- [90m  --- Display Mirror • Stealth Camera • Hotkey Control • Unlimited PC Recording • Drive Sync --- [0m
+  ___                  _  ____             _
+ / _ \ _ __ ___  _ __ (_)/ ___|__ _ _ __ | |_ _   _ _ __ ___
+| | | | '_ ` _ \| '_ \| | |   / _` | '_ \| __| | | | '__/ _ \
+| |_| | | | | | | | | | | |__| (_| | |_) | |_| |_| | | |  __/
+ \___/|_| |_| |_|_| |_|_|\____\__,_| .__/ \__|\__,_|_|  \___|
+                                   |_|  v1.1.0-production
+    High-Performance Android & PC Desktop Capture Suite
 """
     print(banner)
 
@@ -84,10 +79,10 @@ def get_system_status(adb: ADBManager, scrcpy: ScrcpyEngine) -> dict:
     active_dev = None
     battery = {"level": "N/A", "status": "N/A", "powered": "N/A"}
     if devices:
-        # Prefer USB connected device for ultra-low latency
+        # Prefer ready USB connected device for ultra-low latency
         usb_devs = [d for d in devices if not d.get("is_wireless") and d.get("state") == "device"]
         active_dev = usb_devs[0] if usb_devs else devices[0]
-        if active_dev["state"] == "device":
+        if active_dev.get("state") == "device":
             battery = adb.get_battery_info(active_dev["id"])
     return {
         "devices": devices,
@@ -95,6 +90,63 @@ def get_system_status(adb: ADBManager, scrcpy: ScrcpyEngine) -> dict:
         "battery": battery,
         "scrcpy_ready": scrcpy.scrcpy_path.exists()
     }
+
+def resolve_target_device(adb: ADBManager, explicit_id: Optional[str] = None, interactive: bool = False) -> Optional[str]:
+    """
+    Resolve the intended target Android device.
+    If multiple devices are detected and interactive=True, prompts the user to select.
+    Otherwise, auto-selects the first authorized USB device, or first ready device.
+    """
+    devices = adb.list_devices()
+    if not devices:
+        return None
+
+    if explicit_id:
+        for d in devices:
+            if d["id"] == explicit_id:
+                return explicit_id
+        return explicit_id
+
+    if len(devices) == 1:
+        return devices[0]["id"]
+
+    # Multiple devices attached
+    if interactive:
+        print("\n\033[1;33m[!] Multiple Android devices detected:\033[0m")
+        for i, d in enumerate(devices, 1):
+            conn = "Wi-Fi 📶" if d["is_wireless"] else "USB 🔌"
+            state = f"\033[92m[{d['state'].upper()}]\033[0m" if d['state'] == "device" else f"\033[91m[{d['state'].upper()}]\033[0m"
+            print(f"  [{i}] {d['model']} ({d['id']}) - {conn} {state}")
+        sel = input(f"Select target device [1-{len(devices)}, default 1]: ").strip()
+        try:
+            idx = int(sel) - 1
+            if 0 <= idx < len(devices):
+                return devices[idx]["id"]
+        except Exception:
+            pass
+
+    # Non-interactive fallback: prioritize ready USB device
+    ready_usb = [d for d in devices if not d.get("is_wireless") and d.get("state") == "device"]
+    if ready_usb:
+        return ready_usb[0]["id"]
+
+    ready_any = [d for d in devices if d.get("state") == "device"]
+    if ready_any:
+        return ready_any[0]["id"]
+
+    return devices[0]["id"]
+
+def check_device_ready_interactive(adb: ADBManager, dev_id: Optional[str]) -> Optional[str]:
+    """
+    Run preflight check on target device before launching interactive operations.
+    Returns resolved device_id if ready, or None if unavailable/unauthorized.
+    """
+    check = adb.preflight_check(dev_id)
+    if check["status"] != "DEVICE CONNECTED":
+        adb.print_preflight_card(check)
+        input("\033[90mPress Enter to return to main menu...\033[0m")
+        return None
+    return check["device_id"]
 
 def print_status_bar(status: dict):
     print("┌" + "─" * 78 + "┐")
@@ -107,9 +159,19 @@ def print_status_bar(status: dict):
         model = dev.get("model", "Android Device")
         dev_id = dev.get("id", "")
         conn_type = "Wi-Fi 📶" if dev.get("is_wireless") else "USB 🔌"
-        batt = status["battery"]
-        line = f" 📱  \033[1;32m{model}\033[0m ({dev_id}) [{conn_type}] | 🔋  \033[1;33m{batt['level']}\033[0m ({batt['status']})"
-        clean_len = len(f" {model} ({dev_id}) [{conn_type}] | {batt['level']} ({batt['status']})")
+        state = dev.get("state", "unknown")
+
+        if state == "unauthorized":
+            line = f" ⚠️  \033[1;33m{model}\033[0m ({dev_id}) [\033[91mUNAUTHORIZED - UNLOCK PHONE & TAP ALLOW\033[0m]"
+            clean_len = len(f" {model} ({dev_id}) [UNAUTHORIZED - UNLOCK PHONE & TAP ALLOW]")
+        elif state == "offline":
+            line = f" ⚠️  \033[1;31m{model}\033[0m ({dev_id}) [\033[91mDEVICE OFFLINE - RECONNECT USB CABLE\033[0m]"
+            clean_len = len(f" {model} ({dev_id}) [DEVICE OFFLINE - RECONNECT USB CABLE]")
+        else:
+            batt = status["battery"]
+            line = f" 📱  \033[1;32m{model}\033[0m ({dev_id}) [{conn_type}] | 🔋  \033[1;33m{batt['level']}\033[0m ({batt['status']})"
+            clean_len = len(f" {model} ({dev_id}) [{conn_type}] | {batt['level']} ({batt['status']})")
+
         pad = max(0, 78 - clean_len - 4)
         print("│" + line + " " * pad + "│")
     print("└" + "─" * 78 + "┘")
@@ -134,7 +196,7 @@ def show_hotkeys_guide():
   \033[1m[Alt + Up / Down]\033[0m   🔊  Increase / Decrease \033[97mVolume\033[0m
   \033[1m[Alt + R]\033[0m           🔄  Rotate device screen
   \033[1m[Alt + Shift + R]\033[0m   🔁  Reset video capture / encoder
-  \033[1m[Ctrl + C]\033[0m / Close  🛑  \033[91mSTOP Recording\033[0m & automatically upload to Google Drive
+  \033[1m[Enter] / [Ctrl+C]\033[0m  🛑  \033[91mSTOP Dual Recording\033[0m & finalize both files
 
 \033[1;36m==============================================================================\033[0m
 """)
@@ -156,28 +218,31 @@ def interactive_menu(
 
         print("""
 \033[1;37mMAIN MENU OPTIONS:\033[0m
-  \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & Controller\033[0m          (Interactive PC control, keyboard & mouse)
-  \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m           (\033[92mNO camera app opened\033[0m, raw sensor feed)
-  \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m          (\033[92mNO camera app opened\033[0m, selfie camera)
-  \033[1;36m[4]\033[0m 🔴  \033[1mRecord Mobile Screen -> PC\033[0m           (Direct stream with Pause/Resume hotkeys)
-  \033[1;36m[5]\033[0m 🎥  \033[1mRecord Mobile Camera -> PC\033[0m           (Stealth camera + mic audio -> PC)
-  \033[1;36m[6]\033[0m 🔄  \033[1mDual Mode Preview (Screen + Cam)\033[0m     (Display + Camera preview side-by-side)
-  \033[1;32m[7]\033[0m 🔴  \033[1mDual Record (PC Screen + Mobile Cam)\033[0m (\033[93mRecord both at once -> 2 Separate Files\033[0m)
+  \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & PC Touch Controller\033[0m (Interactive control, mouse & keyboard)
+  \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m           (\033[92mNO camera app opened\033[0m, raw sensor stream)
+  \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m          (\033[92mNO camera app opened\033[0m, selfie stream)
+  \033[1;36m[4]\033[0m 🔴  \033[1mRecord Mobile Screen -> PC File\033[0m      (Direct stream with Pause/Resume hotkeys)
+  \033[1;36m[5]\033[0m 🎥  \033[1mRecord Mobile Camera -> PC File\033[0m      (Stealth camera + mic audio -> PC)
+  \033[1;36m[6]\033[0m 🔄  \033[1mDual Live Preview (Screen + Camera)\033[0m  (Display + Camera preview side-by-side)
+  \033[1;32m[7]\033[0m 🎬  \033[1mDual Simultaneous Recording\033[0m          (\033[93mPC Screen + Mobile Cam -> 2 Separate Files\033[0m)
   \033[1;33m[8]\033[0m ⌨️   \033[1mView Keyboard Hotkeys Guide\033[0m          (Pause, Resume, Screen Off, Stop shortcuts)
-  \033[1;36m[9]\033[0m 📶  \033[1mSwitch to Wireless ADB (Wi-Fi)\033[0m       (Unplug USB and capture wirelessly!)
-  \033[1;36m[10]\033[0m ☁️  \033[1mGoogle Drive Cloud Settings\033[0m          (Option A Desktop Sync / Drive API)
-  \033[1;36m[11]\033[0m 🔍 \033[1mDiagnostics & Camera Details\033[0m         (List all camera IDs, resolutions, battery)
+  \033[1;36m[9]\033[0m 📶 \033[1mSwitch to Wireless ADB (Wi-Fi)\033[0m       (Unplug USB and capture over Wi-Fi)
+  \033[1;36m[10]\033[0m ☁️  \033[1mGoogle Drive Cloud Settings\033[0m          (Desktop virtual sync / REST API v3)
+  \033[1;36m[11]\033[0m 🔍 \033[1mDiagnostics & Hardware Inspection\033[0m    (Camera IDs, resolutions, battery, ADB check)
   \033[1;31m[0]\033[0m 🚪  \033[1mExit\033[0m
 """)
         choice = input("\033[1;33mSelect an option [0-11]: \033[0m").strip()
 
         if choice == "1":
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
             print("\n\033[96m[+] Launching Display Mirror & Controller...\033[0m")
             in_mode = input("Input Mode: [1] Standard Touch (Default) | [2] Hardware Mouse (Xiaomi/POCO bypass): ").strip()
             use_uhid = (in_mode == "2")
             screen_off = input("Turn phone screen OFF to save battery? (y/n, default n): ").strip().lower() == "y"
             opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "screen_off": screen_off,
                 "stay_awake": cfg.get("stay_awake", False),
                 "uhid": use_uhid,
@@ -189,13 +254,16 @@ def interactive_menu(
             scrcpy.run_live(cmd)
 
         elif choice == "2":
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
             print("\n\033[96m[+] Launching Stealth Back Camera Stream...\033[0m")
             print("\033[90mNote: Mobile camera app will NOT open. Phone screen stays dark.\033[0m")
             screen_off = input("Turn phone screen OFF? (y/n, default y): ").strip().lower() != "n"
-            if screen_off and dev_id:
-                adb.turn_screen_off(dev_id)
+            if screen_off:
+                adb.turn_screen_off(target)
             opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "camera_facing": "back",
                 "audio_source": "mic"
             }
@@ -203,12 +271,15 @@ def interactive_menu(
             scrcpy.run_live(cmd)
 
         elif choice == "3":
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
             print("\n\033[96m[+] Launching Stealth Front Camera Stream...\033[0m")
             screen_off = input("Turn phone screen OFF? (y/n, default y): ").strip().lower() != "n"
-            if screen_off and dev_id:
-                adb.turn_screen_off(dev_id)
+            if screen_off:
+                adb.turn_screen_off(target)
             opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "camera_facing": "front",
                 "audio_source": "mic"
             }
@@ -216,12 +287,15 @@ def interactive_menu(
             scrcpy.run_live(cmd)
 
         elif choice == "4":
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
             print("\n\033[96m[+] Setup Unlimited Screen Recording\033[0m")
             auto_up = input("Auto-upload to Google Drive after recording? (y/n, default y): ").strip().lower() != "n"
             fmt = input("Format: [1] MP4 (default) | [2] MKV (crash-safe): ").strip()
             fmt_ext = "mkv" if fmt == "2" else "mp4"
             opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "record_format": fmt_ext,
                 "stay_awake": True,
                 "audio_source": "playback"
@@ -230,6 +304,9 @@ def interactive_menu(
             input("\nPress Enter to return to menu...")
 
         elif choice == "5":
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
             print("\n\033[96m[+] Setup Unlimited Stealth Camera Recording\033[0m")
             facing_in = input("Select Camera: [1] Back (default) | [2] Front: ").strip()
             facing = "front" if facing_in == "2" else "back"
@@ -240,7 +317,7 @@ def interactive_menu(
             fmt_ext = "mkv" if fmt == "2" else "mp4"
 
             opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "camera_facing": facing,
                 "record_format": fmt_ext,
                 "screen_off": True,
@@ -251,31 +328,58 @@ def interactive_menu(
             input("\nPress Enter to return to menu...")
 
         elif choice == "6":
-            print("\n\033[96m[+] Launching Dual Mode Preview (Screen + Camera Side-by-Side)...\033[0m")
-            import subprocess
-            cmd_screen = scrcpy.build_command("mirror", {"device_id": dev_id, "window_title": "OmniCapture - Phone Screen"})
-            cmd_cam = scrcpy.build_command("camera", {"device_id": dev_id, "camera_facing": "back", "window_title": "OmniCapture - Camera Feed"})
-            p1 = subprocess.Popen(cmd_screen)
-            p2 = subprocess.Popen(cmd_cam)
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
+            print("\n\033[96m[+] Launching Dual Live Preview (Screen + Camera Side-by-Side)...\033[0m")
+            cmd_screen = scrcpy.build_command("mirror", {"device_id": target, "window_title": "OmniCapture - Phone Screen"})
+            cmd_cam = scrcpy.build_command("camera", {"device_id": target, "camera_facing": "back", "window_title": "OmniCapture - Camera Feed"})
+            env = scrcpy.get_scrcpy_env(adb.adb_path)
+            p1 = subprocess.Popen(cmd_screen, env=env)
+            p2 = subprocess.Popen(cmd_cam, env=env)
             p1.wait()
             p2.wait()
 
         elif choice == "7":
-            print("\n\033[96m[+] Setup Dual Simultaneous Recording (PC Screen + Mobile Camera)\033[0m")
-            print("\033[90mThis will simultaneously record your Windows desktop and mobile camera into 2 separate files.\033[0m\n")
+            # Dual Simultaneous Recording (PC Screen + Mobile Camera)
+            if not recorder.pc_recorder.is_available():
+                print("\n\033[1;31m" + "=" * 70)
+                print("  ❌ DUAL RECORDING ERROR: FFMPEG IS REQUIRED FOR PC SCREEN CAPTURE")
+                print("=" * 70 + "\033[0m")
+                print("  FFmpeg was not found in your system PATH or bin/ folder.")
+                print("  Install via PowerShell: \033[1;33mwinget install Gyan.FFmpeg\033[0m\n")
+                input("\033[90mPress Enter to return to menu...\033[0m")
+                continue
+
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
+
+            print("\n\033[1;36m========================================================================\033[0m")
+            print("  🎬 \033[1mSETUP DUAL SIMULTANEOUS RECORDING (PC Screen + Mobile Camera)\033[0m")
+            print("  \033[90mBoth feeds record concurrently into 2 separate files in recordings/\033[0m")
+            print("\033[1;36m========================================================================\033[0m\n")
+
             facing_in = input("Select Mobile Camera: [1] Back (default) | [2] Front: ").strip()
             facing = "front" if facing_in == "2" else "back"
+
+            pc_fps_in = input("PC Screen Capture FPS [default 30, max 60]: ").strip()
+            pc_fps = int(pc_fps_in) if pc_fps_in.isdigit() and int(pc_fps_in) > 0 else 30
+
+            cam_fps_in = input("Mobile Camera FPS [default 30]: ").strip()
+            cam_fps = int(cam_fps_in) if cam_fps_in.isdigit() and int(cam_fps_in) > 0 else 30
+
             preview_in = input("Show live mobile camera preview window on PC? (y/n, default y): ").strip().lower() != "n"
-            auto_up = input("Auto-upload both recordings to Google Drive after recording? (y/n, default y): ").strip().lower() != "n"
+            auto_up = input("Auto-upload both recordings to Google Drive after recording? (y/n, default n): ").strip().lower() == "y"
             fmt = input("Format: [1] MP4 (default) | [2] MKV (crash-safe): ").strip()
             fmt_ext = "mkv" if fmt == "2" else "mp4"
 
             dual_opts = {
-                "device_id": dev_id,
+                "device_id": target,
                 "camera_facing": facing,
                 "record_format": fmt_ext,
-                "pc_fps": 30,
-                "camera_fps": 30,
+                "pc_fps": pc_fps,
+                "camera_fps": cam_fps,
                 "screen_off": True,
                 "no_playback": not preview_in,
                 "audio_source": "mic"
@@ -288,8 +392,11 @@ def interactive_menu(
             input("Press Enter to return to menu...")
 
         elif choice == "9":
-            print("\n\033[96m[+] Setting up Wireless ADB...\033[0m")
-            ok, msg = adb.enable_wireless(dev_id)
+            target = check_device_ready_interactive(adb, dev_id)
+            if not target:
+                continue
+            print(f"\n\033[96m[+] Setting up Wireless ADB for [{target}]...\033[0m")
+            ok, msg = adb.enable_wireless(target)
             if ok:
                 print(f"\033[92m[✓] {msg}\033[0m")
             else:
@@ -300,7 +407,7 @@ def interactive_menu(
             drive_menu(cfg, uploader)
 
         elif choice == "11":
-            show_diagnostics(adb, scrcpy, dev_id)
+            show_diagnostics(adb, scrcpy, dev_id, recorder.pc_recorder)
             input("\nPress Enter to return to menu...")
 
         elif choice == "0":
@@ -365,42 +472,65 @@ def drive_menu(cfg: dict, uploader: DriveUploader):
         elif c == "0":
             break
 
-def show_diagnostics(adb: ADBManager, scrcpy: ScrcpyEngine, dev_id: str):
-    print("\n\033[1;36m=== DEVICE DIAGNOSTICS & HARDWARE CAPABILITIES ===\033[0m\n")
-    if not dev_id:
-        print("\033[91m[!] No device connected. Connect your phone via USB first.\033[0m")
-        return
-    print("\033[1;33m[1] Battery & Power:\033[0m")
-    batt = adb.get_battery_info(dev_id)
-    print(f"  Level:   {batt['level']}")
-    print(f"  Status:  {batt['status']}")
-    print(f"  Powered: {batt['powered']}\n")
+def show_diagnostics(adb: ADBManager, scrcpy: ScrcpyEngine, dev_id: Optional[str] = None, pc_recorder: Optional[Any] = None):
+    print("\n\033[1;36m=== SYSTEM, RUNTIME & HARDWARE DIAGNOSTICS ===\033[0m\n")
 
-    print("\033[1;33m[2] Wi-Fi IP Address:\033[0m")
-    ip = adb.get_wifi_ip(dev_id)
-    print(f"  IP: {ip or 'Not found / Wi-Fi disconnected'}\n")
+    # [1] Software Binaries
+    print("\033[1;33m[1] Runtime Binaries & Engines:\033[0m")
+    adb_ver = adb.get_adb_version() or "Not detected"
+    print(f"  ADB Binary:    {adb.adb_path} ({adb_ver})")
+    print(f"  Scrcpy Engine: {scrcpy.scrcpy_path}")
+    if pc_recorder:
+        ff_ver = pc_recorder.get_ffmpeg_version() or "Not detected"
+        print(f"  FFmpeg Engine: {pc_recorder.ffmpeg_path or 'NOT FOUND'} ({ff_ver})")
 
-    print("\033[1;33m[3] Camera Sensors (Camera2 API):\033[0m")
-    cams = scrcpy.query_cameras(dev_id)
-    print(cams)
+    # [2] Preflight Check on Android Device
+    print("\n\033[1;33m[2] Android Device Preflight Check:\033[0m")
+    check = adb.preflight_check(dev_id)
+    target_id = check.get("device_id")
+    status_str = check.get("status")
 
-    print("\033[1;33m[4] Supported Camera Resolutions:\033[0m")
-    sizes = scrcpy.query_camera_sizes(dev_id)
-    print(sizes)
+    if status_str == "DEVICE CONNECTED":
+        props = check.get("properties", {})
+        print(f"  Status:       \033[1;32m{status_str}\033[0m")
+        print(f"  Serial ID:    {target_id}")
+        print(f"  Model:        {props.get('brand', '').upper()} {props.get('model', 'Android Device')}")
+        print(f"  Android OS:   Version {props.get('android_version', 'N/A')} (SDK {props.get('sdk_version', 'N/A')})")
+        print(f"  Connection:   {'Wi-Fi (TCP/IP)' if check.get('is_wireless') else 'USB Cable'}")
+
+        # Battery
+        batt = adb.get_battery_info(target_id)
+        print(f"  Battery:      {batt['level']} ({batt['status']}, Powered: {batt['powered']})")
+
+        # IP
+        ip = adb.get_wifi_ip(target_id)
+        print(f"  Wi-Fi IP:     {ip or 'Not found / Wi-Fi disconnected'}")
+
+        # [3] Camera Sensors
+        print("\n\033[1;33m[3] Camera Sensors (Camera2 API):\033[0m")
+        cams = scrcpy.query_cameras(target_id)
+        print(cams)
+
+        # [4] Camera Resolutions
+        print("\n\033[1;33m[4] Supported Camera Resolutions:\033[0m")
+        sizes = scrcpy.query_camera_sizes(target_id)
+        print(sizes)
+    else:
+        adb.print_preflight_card(check)
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="OmniCapture - Display & Stealth Camera Capture Suite")
+    parser = argparse.ArgumentParser(description="OmniCapture - Display, Stealth Camera & Dual PC Recording Suite")
     subparsers = parser.add_subparsers(dest="command")
 
     # Command: mirror
-    p_mirror = subparsers.add_parser("mirror", help="Mirror phone display with PC control")
+    p_mirror = subparsers.add_parser("mirror", help="Mirror phone display with interactive PC control")
     p_mirror.add_argument("--screen-off", action="store_true", help="Turn phone screen off")
     p_mirror.add_argument("--uhid", action="store_true", help="Hardware mouse/keyboard simulation (bypasses Xiaomi/POCO lock)")
     p_mirror.add_argument("--device", help="Specific device ID")
 
     # Command: camera
     p_cam = subparsers.add_parser("camera", help="Stream camera without opening mobile camera app")
-    p_cam.add_argument("--facing", choices=["back", "front", "external"], default="back", help="Camera facing")
+    p_cam.add_argument("--facing", choices=["back", "front", "external"], default="back", help="Camera facing (default: back)")
     p_cam.add_argument("--device", help="Specific device ID")
     p_cam.add_argument("--size", help="Resolution (e.g. 1920x1080)")
     p_cam.add_argument("--fps", type=int, default=30, help="Capture frame rate")
@@ -415,6 +545,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec.add_argument("--pc-fps", type=int, default=30, help="PC screen frame rate (for source=dual, default: 30)")
     p_rec.add_argument("--camera-fps", type=int, default=30, help="Mobile camera frame rate (default: 30)")
     p_rec.add_argument("--camera-size", help="Mobile camera resolution (e.g. 1920x1080)")
+    p_rec.add_argument("--device", help="Specific device ID")
 
     # Command: dual-record
     p_dual = subparsers.add_parser("dual-record", help="Record PC screen and mobile camera simultaneously to 2 separate files")
@@ -431,7 +562,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("hotkeys", help="Display all active keyboard shortcuts and hotkeys")
 
     # Command: wireless
-    subparsers.add_parser("wireless", help="Switch connected phone to wireless Wi-Fi ADB")
+    p_wire = subparsers.add_parser("wireless", help="Switch connected phone to wireless Wi-Fi ADB")
+    p_wire.add_argument("--device", help="Specific device ID")
 
     # Command: upload
     p_up = subparsers.add_parser("upload", help="Upload a video to Google Drive")
@@ -441,58 +573,57 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("drive-setup", help="Configure Google Drive Auto-Upload settings")
 
     # Command: info
-    subparsers.add_parser("info", help="Show connected device and camera diagnostics")
+    p_info = subparsers.add_parser("info", help="Show connected device and camera diagnostics")
+    p_info.add_argument("--device", help="Specific device ID")
 
     return parser
 
 def main():
     cfg = load_config()
-    adb = ADBManager(cfg.get("scrcpy_dir", ""))
-    scrcpy = ScrcpyEngine(cfg.get("scrcpy_dir", ""))
+    adb = ADBManager(cfg.get("scrcpy_dir", "bin"))
+    scrcpy = ScrcpyEngine(cfg.get("scrcpy_dir", "bin"))
     uploader = DriveUploader(cfg)
     recorder = RecordingManager(cfg.get("recordings_dir", str(BASE_DIR / "recordings")), scrcpy, uploader, adb)
 
     parser = build_parser()
     args = parser.parse_args()
 
-    # Auto-resolve target device if not explicitly provided
-    target_dev = getattr(args, "device", None)
-    if not target_dev and args.command:
-        devices = adb.list_devices()
-        if devices:
-            usb_devs = [d for d in devices if not d.get("is_wireless") and d.get("state") == "device"]
-            target_dev = usb_devs[0]["id"] if usb_devs else devices[0]["id"]
-
+    # If no command, run interactive menu
     if not args.command:
-        # Launch interactive TUI
         interactive_menu(cfg, adb, scrcpy, recorder, uploader)
-    elif args.command == "hotkeys":
+        return
+
+    # CLI Command Dispatch
+    if args.command == "hotkeys":
         show_hotkeys_guide()
-    elif args.command == "mirror":
-        opts = {
-            "device_id": target_dev,
-            "screen_off": args.screen_off,
-            "stay_awake": False,
-            "uhid": args.uhid,
-            "max_size": cfg.get("max_size", 1200),
-            "bit_rate": cfg.get("video_bit_rate", "8M"),
-            "max_fps": cfg.get("max_fps", 60)
-        }
-        cmd = scrcpy.build_command("mirror", opts)
-        scrcpy.run_live(cmd)
-    elif args.command == "camera":
-        if target_dev:
-            adb.turn_screen_off(target_dev)
-        opts = {
-            "device_id": target_dev,
-            "camera_facing": args.facing,
-            "camera_size": args.size,
-            "camera_fps": args.fps,
-            "audio_source": "mic"
-        }
-        cmd = scrcpy.build_command("camera", opts)
-        scrcpy.run_live(cmd)
-    elif args.command == "dual-record" or (args.command == "record" and args.source == "dual"):
+        return
+
+    if args.command == "upload":
+        ok, msg = uploader.upload_file(args.file)
+        print(msg)
+        sys.exit(0 if ok else 1)
+
+    if args.command == "drive-setup":
+        drive_menu(cfg, uploader)
+        return
+
+    # Commands requiring target Android device
+    target_dev = resolve_target_device(adb, getattr(args, "device", None), interactive=False)
+
+    if args.command == "info":
+        show_diagnostics(adb, scrcpy, target_dev, recorder.pc_recorder)
+        return
+
+    if args.command == "wireless":
+        check = adb.preflight_check(target_dev)
+        if check["status"] != "DEVICE CONNECTED":
+            adb.print_preflight_card(check)
+            sys.exit(1)
+        ok, msg = adb.enable_wireless(check["device_id"])
+        print(msg)
+        sys.exit(0 if ok else 1)
+
+    if args.command in ("dual-record",) or (args.command == "record" and args.source == "dual"):
         dual_opts = {
             "device_id": target_dev,
             "camera_facing": getattr(args, "facing", "back"),
@@ -504,7 +635,41 @@ def main():
             "screen_off": True,
             "audio_source": "mic"
         }
-        recorder.record_dual_pc_and_mobile_camera(dual_opts, auto_upload=args.upload)
+        res = recorder.record_dual_pc_and_mobile_camera(dual_opts, auto_upload=args.upload)
+        sys.exit(0 if res.get("success") else 1)
+
+    # Preflight check for mirror, camera, record
+    check = adb.preflight_check(target_dev)
+    if check["status"] != "DEVICE CONNECTED":
+        adb.print_preflight_card(check)
+        sys.exit(1)
+    target_dev = check["device_id"]
+
+    if args.command == "mirror":
+        opts = {
+            "device_id": target_dev,
+            "screen_off": args.screen_off,
+            "stay_awake": False,
+            "uhid": args.uhid,
+            "max_size": cfg.get("max_size", 1200),
+            "bit_rate": cfg.get("video_bit_rate", "8M"),
+            "max_fps": cfg.get("max_fps", 60)
+        }
+        cmd = scrcpy.build_command("mirror", opts)
+        scrcpy.run_live(cmd)
+
+    elif args.command == "camera":
+        adb.turn_screen_off(target_dev)
+        opts = {
+            "device_id": target_dev,
+            "camera_facing": args.facing,
+            "camera_size": args.size,
+            "camera_fps": args.fps,
+            "audio_source": "mic"
+        }
+        cmd = scrcpy.build_command("camera", opts)
+        scrcpy.run_live(cmd)
+
     elif args.command == "record":
         mode = "record_camera" if args.source == "camera" else "record_screen"
         opts = {
@@ -516,19 +681,8 @@ def main():
             "stay_awake": True if args.source == "screen" else False,
             "audio_source": "mic" if args.source == "camera" else "playback"
         }
-        recorder.record_session(mode, opts, auto_upload=args.upload)
-    elif args.command == "wireless":
-        ok, msg = adb.enable_wireless()
-        print(msg)
-    elif args.command == "upload":
-        ok, msg = uploader.upload_file(args.file)
-        print(msg)
-    elif args.command == "drive-setup":
-        drive_menu(cfg, uploader)
-    elif args.command == "info":
-        devices = adb.list_devices()
-        dev_id = devices[0]["id"] if devices else None
-        show_diagnostics(adb, scrcpy, dev_id)
+        file_path, dur, sz = recorder.record_session(mode, opts, auto_upload=args.upload)
+        sys.exit(0 if file_path else 1)
 
 if __name__ == "__main__":
     main()

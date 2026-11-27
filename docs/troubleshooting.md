@@ -13,6 +13,8 @@ This guide covers common issues, error codes, and step-by-step solutions for **O
 | **Touch clicks ignored on Xiaomi/POCO** | MIUI/HyperOS security block | Turn on `USB debugging (Security settings)` or run with `--uhid` |
 | **`MediaCodec Error 0xfffffff4`** | Phone GPU encoder overwhelmed by high resolution | Use `--max-size=1200` (set as default in `config.json`) |
 | **Audio playback disabled on Android 12** | Android system limitation | Audio playback capture requires Android 13+; use `--audio-source=mic` |
+| **Mobile camera file is 0 bytes** | ADB device disconnected / scrcpy launch failed | Run preflight diagnostic via `python omni.py info`; check USB cable |
+| **FFmpeg not found for PC recording** | FFmpeg missing from PATH and bin/ | Run `winget install Gyan.FFmpeg` or copy `ffmpeg.exe` to `bin/` |
 | **Google Drive virtual drive not found** | Google Drive for Desktop not running | Start Google Drive app or set custom sync path in `drive-setup` |
 | **PowerShell script execution error** | ExecutionPolicy restriction | Run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` |
 
@@ -61,23 +63,48 @@ OmniCapture will simulate an actual hardware USB mouse directly at the Linux ker
 
 ---
 
+## 🎬 Dual Recording & PC Capture Issues
+
+### 4. `ERROR: Could not find any ADB device` / Mobile Camera Fails
+If PC recording works but mobile camera recording fails:
+- **Cause**: The Android device was either disconnected, in an `unauthorized` state, or running a conflicting ADB daemon version.
+- **Resolution**:
+  1. OmniCapture v1.1.0 includes an automatic **preflight check**. If no device is connected, the application halts immediately with clear remediation steps rather than failing silently or creating empty 0-byte files.
+  2. Run `python omni.py info` to confirm your device is in state `DEVICE CONNECTED`.
+  3. Ensure your phone screen is unlocked and USB debugging authorization is granted.
+
+### 5. `FFmpeg is required for PC screen capture but was not found`
+- **Cause**: Windows PC desktop capture utilizes FFmpeg's `gdigrab` device.
+- **Resolution**:
+  1. Open PowerShell and install FFmpeg:
+     ```powershell
+     winget install Gyan.FFmpeg
+     ```
+  2. Alternatively, place `ffmpeg.exe` directly inside the `bin/` folder of the OmniCapture repository.
+
+### 6. Difference Between Option [6] and Option [7]
+- **Option [6] Dual Live Preview (Screen + Camera)**: Opens two synchronized, interactive live preview windows side-by-side on your desktop without recording to disk.
+- **Option [7] Dual Simultaneous Recording**: Concurrently captures both your PC Desktop and Mobile Camera directly to two independent MP4/MKV video files in `recordings/`.
+
+---
+
 ## 🎥 Video Encoding & Performance Issues
 
-### 4. Video Freezes or Stutters
+### 7. Video Freezes or Stutters
 1. **Reduce Resolution**: If your phone uses an entry-level processor (e.g. Snapdragon 600-series or MediaTek Helio), native 1080×2340 encoding can drop frames. Set `--max-size=1200` in `config.json` or pass `--size`:
    ```powershell
    python omni.py mirror --size 1200
    ```
 2. **Wi-Fi Jitter**: If streaming over Wi-Fi, ensure your phone and PC are connected to a 5GHz Wi-Fi band, or switch to a direct USB cable for rock-solid performance.
 
-### 5. `Cannot request to turn screen off if control is disabled`
+### 8. `Cannot request to turn screen off if control is disabled`
 This error occurs in stock scrcpy when `--turn-screen-off` is passed during camera mode (`--video-source=camera`). OmniCapture automatically filters out incompatible flags and handles stealth screen darkening via low-level ADB sleep keyevents (`KEYCODE_SLEEP`).
 
 ---
 
 ## ☁️ Cloud Sync Issues
 
-### 6. `Google Drive Desktop virtual drive not detected`
+### 9. `Google Drive Desktop virtual drive not detected`
 - If you use Google Drive for Desktop, ensure the application is running in your Windows taskbar system tray.
 - If your Google Drive is mapped to a drive letter other than `G:` (e.g. `H:` or a custom folder):
   1. Run:
