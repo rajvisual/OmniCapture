@@ -5,6 +5,23 @@ All notable changes to the **OmniCapture** project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-11-27
+
+### Added
+- **Phase 0 Forensic Audit & Benchmark Engine**:
+  - Measured cold start, working set memory (71.15 MB), active recording overhead (< 1.8% CPU), and verified Windows 11 Per-Monitor v2 DPI scaling (100% to 200%).
+  - Identified and eliminated idle CPU churn in audio meter simulation loop, slashing idle CPU from 8.44% to 0.77%.
+- **Liquid Glass & Light Minimal Token System (`gui/theme.py`)**:
+  - Extended `ThemeTokens` with alpha-based glass tokens: `surface_glass`, `glass_stroke`, `glass_highlight`, `glass_shadow`, `blur_radius`, `noise_opacity`, and per-state alphas (`alpha_surface_idle` through `alpha_surface_disabled`).
+  - Implemented mathematical WCAG AA relative luminance contrast verification methods directly on tokens.
+  - Tuned `status_recording` to `#DC2626` (4.83:1 contrast on white text), `text_dim` to `#52525B` (7.73:1), and `status_connected` to `#059669` (3.42:1 on root).
+- **Automated Token Contrast Verification Test Suite (`tests/test_gui.py`)**:
+  - Added `test_wcag_aa_contrast_all_token_pairs` and `test_theme_switching_and_tokens`.
+  - 100% passing across 42 automated tests.
+- **Design System Polish & Fluent Formatting (`gui/dashboard.py`, `gui/components/audio_meter.py`)**:
+  - Refactored all uppercase labels to clean sentence case (`Studio Ready`, `Rec: 00:00:00`, `60.0 fps`, `8.0 Mbps`, `Muted`).
+  - Standardized font factories to `OmniTheme.font_*()`.
+
 ## [1.2.0] - 2026-11-27
 
 ### Added

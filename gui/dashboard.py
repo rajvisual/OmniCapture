@@ -336,7 +336,7 @@ class OmniCaptureApp(ctk.CTk):
         self.cv_crosshair = ctk.CTkLabel(
             self.cv_screen_box,
             text="+",
-            font=ctk.CTkFont(family="Segoe UI", size=16),
+            font=OmniTheme.font_headline(),
             text_color=tokens.text_dim
         )
         self.cv_crosshair.place(relx=0.5, rely=0.5, anchor="center")
@@ -373,7 +373,7 @@ class OmniCaptureApp(ctk.CTk):
         self.cv_pip_lbl = ctk.CTkLabel(
             self.cv_pip_box,
             text="Camera2 Sensor",
-            font=ctk.CTkFont(size=9, weight="bold"),
+            font=OmniTheme.font_caption(),
             text_color=tokens.text_primary
         )
         self.cv_pip_lbl.pack(expand=True)
@@ -392,8 +392,8 @@ class OmniCaptureApp(ctk.CTk):
 
         self.cv_tally_dot = ctk.CTkLabel(
             hud_row,
-            text="● REC",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            text="● Rec",
+            font=OmniTheme.font_meta(),
             text_color=tokens.status_recording
         )
         self.cv_tally_dot.pack(side="left", padx=(0, 10))
@@ -737,12 +737,12 @@ class OmniCaptureApp(ctk.CTk):
         self.footer = ctk.CTkFrame(self, fg_color=tokens.bg_header, height=28, corner_radius=0)
         self.footer.pack(fill="x", side="bottom")
 
-        self.foot_status_chip = StatusChip(self.footer, text="STUDIO READY", state="ready")
+        self.foot_status_chip = StatusChip(self.footer, text="Studio Ready", state="ready")
         self.foot_status_chip.pack(side="left", padx=12, pady=2)
 
         self.foot_rec_time = ctk.CTkLabel(
             self.footer,
-            text="REC: 00:00:00",
+            text="Rec: 00:00:00",
             font=OmniTheme.font_mono(11),
             text_color=tokens.text_muted
         )
@@ -750,7 +750,7 @@ class OmniCaptureApp(ctk.CTk):
 
         self.foot_fps_lbl = ctk.CTkLabel(
             self.footer,
-            text="FPS: 60.0",
+            text="60.0 fps",
             font=OmniTheme.font_mono(11),
             text_color=tokens.text_dim
         )
@@ -758,7 +758,7 @@ class OmniCaptureApp(ctk.CTk):
 
         self.foot_bitrate_lbl = ctk.CTkLabel(
             self.footer,
-            text="BITRATE: 8.0M",
+            text="8.0 Mbps",
             font=OmniTheme.font_mono(11),
             text_color=tokens.text_dim
         )
@@ -785,9 +785,9 @@ class OmniCaptureApp(ctk.CTk):
             rec_dir = self.controller.recordings_dir
             usage = shutil.disk_usage(rec_dir)
             free_gb = usage.free / (1024 ** 3)
-            return f"DISK: {free_gb:.1f} GB free"
+            return f"Disk: {free_gb:.1f} GB free"
         except Exception:
-            return "DISK: OK"
+            return "Disk: OK"
 
     # -------------------------------------------------------------------------
     # 5. RUNTIME THEME SWITCHING ENGINE
@@ -845,13 +845,15 @@ class OmniCaptureApp(ctk.CTk):
             # Subtle Recording Pulse Animation
             if is_active and self._recording_pulse_active:
                 self._pulse_phase = (self._pulse_phase + 1) % 16
-                pulse_color = "#DC2626" if self._pulse_phase < 8 else "#EF4444"
+                tokens = OmniTheme.get_tokens()
+                pulse_color = tokens.status_recording_hover if self._pulse_phase < 8 else tokens.status_recording
                 try:
                     self.master_record_btn.configure(fg_color=pulse_color)
                 except Exception:
                     pass
 
-            self.after(80, _loop)
+            delay = 80 if is_active else 250
+            self.after(delay, _loop)
 
         self.after(500, _loop)
 

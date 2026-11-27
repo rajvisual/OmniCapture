@@ -139,12 +139,29 @@ class TestGUIComponents(unittest.TestCase):
         self.assertEqual(tokens_light.name, "light")
         self.assertFalse(tokens_light.is_dark)
         self.assertEqual(OmniTheme.BG_ROOT, tokens_light.bg_root)
+        self.assertEqual(OmniTheme.BLUR_RADIUS, 0)
+        self.assertEqual(OmniTheme.NOISE_OPACITY, 0.0)
 
         OmniTheme.set_theme("dark")
         tokens_dark = OmniTheme.get_tokens()
         self.assertEqual(tokens_dark.name, "dark")
         self.assertTrue(tokens_dark.is_dark)
         self.assertEqual(OmniTheme.BG_ROOT, tokens_dark.bg_root)
+        self.assertIn("rgba", OmniTheme.SURFACE_GLASS)
+        self.assertEqual(OmniTheme.BLUR_RADIUS, 28)
+        self.assertGreater(OmniTheme.NOISE_OPACITY, 0.0)
+
+    def test_wcag_aa_contrast_all_token_pairs(self):
+        """Verify WCAG AA contrast compliance across all foreground/background token pairs."""
+        from gui.theme import LIGHT_MINIMAL, DARK_LIQUID_GLASS
+
+        for theme in [LIGHT_MINIMAL, DARK_LIQUID_GLASS]:
+            audit = theme.validate_wcag_aa()
+            for check_name, data in audit.items():
+                self.assertTrue(
+                    data["passed"],
+                    f"Theme {theme.name} failed WCAG AA check '{check_name}': ratio {data['ratio']} < required {data['required']}"
+                )
 
     def test_components_and_dialogs_import(self):
         """Verify all desktop components and dialogs are importable and exposed."""

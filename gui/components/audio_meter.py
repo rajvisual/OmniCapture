@@ -31,6 +31,7 @@ class AudioChannelStrip(ctk.CTkFrame):
         self.channel_name = channel_name
         self.volume = initial_volume
         self.is_muted = False
+        self._current_level = 0.0
         self.on_volume_change = on_volume_change
         self.on_mute_toggle = on_mute_toggle
 
@@ -132,14 +133,15 @@ class AudioChannelStrip(ctk.CTkFrame):
         tokens = OmniTheme.get_tokens()
         if self.is_muted:
             self.mute_btn.configure(
-                text="MUTED",
+                text="Muted",
                 fg_color=tokens.status_recording,
                 hover_color=tokens.status_recording_hover,
-                text_color="#FFFFFF",
+                text_color=tokens.text_primary if not tokens.is_dark else "#FFFFFF",
                 border_color=tokens.status_recording
             )
-            self.db_label.configure(text="MUTED", text_color=tokens.status_recording)
+            self.db_label.configure(text="Muted", text_color=tokens.status_recording)
             self.meter_bar.set(0.0)
+            self._current_level = 0.0
         else:
             self.mute_btn.configure(
                 text="Mute",
@@ -156,10 +158,15 @@ class AudioChannelStrip(ctk.CTkFrame):
     def set_level(self, level: float):
         """Update live audio level (0.0 to 1.0) with smooth dynamic color transitions."""
         if self.is_muted:
-            self.meter_bar.set(0.0)
+            if self._current_level != 0.0:
+                self._current_level = 0.0
+                self.meter_bar.set(0.0)
             return
 
         level = max(0.0, min(1.0, level * self.volume))
+        if abs(level - self._current_level) < 0.005 and level == 0.0:
+            return
+        self._current_level = level
         self.meter_bar.set(level)
 
         tokens = OmniTheme.get_tokens()
