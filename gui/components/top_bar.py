@@ -82,7 +82,20 @@ class UnifiedTopBar(ctk.CTkFrame):
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
         )
-        self.ver_lbl.pack(side="left", padx=(0, 12))
+        self.ver_lbl.pack(side="left", padx=(0, 8))
+
+        # Simulated Device Mode Indicator Badge (Dev-only, hidden in real hardware mode)
+        self.sim_badge = ctk.CTkLabel(
+            self.left_box,
+            text="SIMULATED DEVICE",
+            font=OmniTheme.font_mono(9),
+            fg_color=tokens.status_warning,
+            text_color="#FFFFFF",
+            corner_radius=4,
+            padx=6,
+            pady=1
+        )
+        # Not packed by default; shown via set_simulated_mode(True)
 
         # In-App Menu Items
         self._build_menu_buttons(self.left_box, tokens)
@@ -267,6 +280,7 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"separator": True},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
             {"separator": True},
+            {"label": "Developer: Simulated Device...", "command": h.get("open_simulated_device")},
             {"label": "Developer: Component Gallery...", "command": h.get("open_gallery")},
         ]
 
@@ -296,6 +310,8 @@ class UnifiedTopBar(ctk.CTkFrame):
     def _get_help_menu_items(self) -> list:
         h = self.menu_handlers
         return [
+            {"label": "Getting Started Checklist...", "command": h.get("open_onboarding")},
+            {"separator": True},
             {"label": "Keyboard Shortcuts", "accelerator": "Ctrl+/", "command": h.get("open_hotkeys_guide")},
             {"label": "Hardware Diagnostics", "command": h.get("open_diagnostics")},
             {"separator": True},
@@ -338,3 +354,12 @@ class UnifiedTopBar(ctk.CTkFrame):
             text_color=tokens.text_muted,
             border_color=tokens.border_subtle
         )
+
+    def set_simulated_mode(self, active: bool):
+        """Toggle prominent developer-only Simulated Device Mode badge."""
+        if active:
+            if not self.sim_badge.winfo_ismapped():
+                self.sim_badge.pack(side="left", padx=(0, 10), after=self.ver_lbl)
+        else:
+            if self.sim_badge.winfo_ismapped():
+                self.sim_badge.pack_forget()

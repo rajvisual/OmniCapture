@@ -63,6 +63,13 @@ class GUIController:
         self._dual_timer_thread: Optional[threading.Thread] = None
         self._dual_stop_event = threading.Event()
 
+    def set_simulated_device_manager(self, sim_adb):
+        """Inject simulated device manager for testing and developer mode."""
+        self.adb = sim_adb
+        self.recorder.adb = sim_adb
+        self._device_cache["device_id"] = None
+        self._device_cache["status"] = "NO DEVICE"
+
     # -------------------------------------------------------------------------
     # Device Poller & State
     # -------------------------------------------------------------------------

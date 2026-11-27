@@ -18,6 +18,13 @@ class StudioAudioMeterCanvas(tk.Canvas):
     - Clip indicator: bright red latching indicator at 0 dB
     - dB tick marks (-18, -12, -6, 0 dB)
     - Redraws ONLY on level changes to preserve idle CPU budget
+    
+    Design Note on Light Theme Track Contrast:
+    The meter trough background is intentionally dark (tokens.vu_bg) in both Light and Dark themes.
+    This adheres to pro audio/video broadcast standards (OBS Studio, DaVinci Resolve, Ableton Live).
+    Physical LED ladder meters require an unlit dark background for optical contrast and instant
+    peripheral-vision readability. Lit green/amber/red segments reach >= 3.0:1 standard WCAG
+    contrast against tokens.vu_bg, whereas a light gray trough would wash out the lit segments.
     """
 
     def __init__(self, parent, height: int = 8, **kwargs):

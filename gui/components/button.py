@@ -29,7 +29,8 @@ class StudioButton(ctk.CTkButton):
         self._tooltip: Optional[Tooltip] = None
 
         tokens = OmniTheme.get_tokens()
-        height = 44 if size == "large" else (28 if size == "small" else OmniTheme.CONTROL_HEIGHT)
+        custom_height = kwargs.pop("height", None)
+        height = custom_height or (44 if size == "large" else (28 if size == "small" else OmniTheme.CONTROL_HEIGHT))
         width = 32 if variant == "icon" and not text else kwargs.pop("width", 80)
 
         super().__init__(

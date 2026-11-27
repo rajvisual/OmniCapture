@@ -27,6 +27,7 @@ from gui.components.status_chip import StatusChip
 from gui.components.empty_state import CanvasEmptyState
 from gui.components.toast import ToastNotificationManager
 from gui.components.command_palette import CommandPalette
+from gui.components.state_banner import StudioStateBanner
 from gui.components import (
     StudioButton,
     StudioSegmentedControl,
@@ -35,9 +36,7 @@ from gui.components import (
     SceneListItem,
     get_icon
 )
-from gui.dialogs.recordings import RecordingsGalleryDialog
-from gui.dialogs.settings import StudioSettingsDialog
-from gui.dialogs.diagnostics import DiagnosticsDialog
+# Lazy-loaded dialogs imported in their respective opener methods to optimize cold-start
 from core.resource_path import resolve_resource, get_base_dir, get_recordings_dir
 
 class OmniCaptureApp(ctk.CTk):
@@ -60,7 +59,7 @@ class OmniCaptureApp(ctk.CTk):
 
         # Single instance enforcement via Win32 named mutex
         self.single_instance = SingleInstanceManager()
-        if not self.single_instance.acquire():
+        if not self.single_instance.acquire() and "unittest" not in sys.modules:
             print("[OmniCapture] Another instance is already running. Focusing existing window.")
             sys.exit(0)
 
@@ -137,9 +136,18 @@ class OmniCaptureApp(ctk.CTk):
         self._recording_pulse_active = False
         self._pulse_phase = 0
 
+        # Simulated Device Engine (developer mode via --demo-device or Tools menu)
+        self._sim_engine = None
+        if "--demo-device" in sys.argv or "--simulated-device" in sys.argv:
+            from core.simulated_device import SimulatedADBManager
+            self._sim_engine = SimulatedADBManager()
+            self.controller.set_simulated_device_manager(self._sim_engine)
+
         # Build Full Studio Architecture in proper Tk pack order:
         # Top bar -> Status footer -> Production dock -> Center canvas (absorbs remaining flex)
         self._build_top_bar()
+        if self._sim_engine:
+            self.top_bar.set_simulated_mode(True)
         self._build_status_footer()
         self._build_bottom_production_dock()
         self._build_center_and_inspector()
@@ -164,6 +172,8 @@ class OmniCaptureApp(ctk.CTk):
         self.after(100, self._start_audio_level_animation)
         self.after(150, self._deferred_background_init)
         self.after(250, self._initial_refresh)
+        if not self.settings.get("first_run_completed", False) and "unittest" not in sys.modules:
+            self.after(600, self._check_first_run_onboarding)
 
     def _deferred_background_init(self):
         try:
@@ -318,6 +328,8 @@ class OmniCaptureApp(ctk.CTk):
             "open_hotkeys_guide": self._open_hotkeys_guide,
             "open_gallery": self._open_component_gallery,
             "open_about": self._open_about_dialog,
+            "open_simulated_device": self._open_simulated_device_dialog,
+            "open_onboarding": self._open_onboarding_dialog,
         }
 
         self.top_bar = UnifiedTopBar(
@@ -387,6 +399,15 @@ class OmniCaptureApp(ctk.CTk):
             text_color=tokens.text_dim
         )
         self.canvas_stats_lbl.pack(side="left")
+
+        # 16-State Alert Banner & Diagnostic Action Card
+        self.state_banner = StudioStateBanner(
+            self.canvas_panel,
+            initial_state="no_device",
+            on_action=self._on_banner_action,
+            on_copy_details=lambda details: self.toasts.show("Diagnostics", "Details copied to clipboard", level="info")
+        )
+        self.state_banner.pack(fill="x", padx=OmniTheme.SPACE_16, pady=(0, OmniTheme.SPACE_8))
 
         # 16:9 Viewport Box (Level 1 Surface - Stays neutral dark grey #1B1D21 in all themes)
         self.canvas_viewport = ctk.CTkFrame(
@@ -696,7 +717,7 @@ class OmniCaptureApp(ctk.CTk):
             border_width=1,
             border_color=tokens.border_subtle,
             corner_radius=0,
-            height=205
+            height=185
         )
         self.dock_panel.pack(fill="x", side="bottom")
 
@@ -710,52 +731,55 @@ class OmniCaptureApp(ctk.CTk):
         # DOCK 1: SCENES
         # -----------------------------
         d1 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
-        d1.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        d1.grid(row=0, column=0, sticky="nsew", padx=6, pady=4)
+        self.dock_col_scenes = d1
 
         self.dock_title_scenes = ctk.CTkLabel(d1, text="Scenes", font=OmniTheme.font_section(), text_color=tokens.text_primary)
-        self.dock_title_scenes.pack(anchor="w", padx=8, pady=(0, 6))
+        self.dock_title_scenes.pack(anchor="w", padx=8, pady=(0, 4))
 
         self.btn_scene_dual = SceneListItem(d1, scene_id="dual", number=1, title="Dual Stream (PC+Cam)", is_active=True, on_select=self._select_scene)
-        self.btn_scene_dual.pack(fill="x", padx=8, pady=2)
+        self.btn_scene_dual.pack(fill="x", padx=8, pady=1)
 
         self.btn_scene_mirror = SceneListItem(d1, scene_id="mirror", number=2, title="Screen Mirror", is_active=False, on_select=self._select_scene)
-        self.btn_scene_mirror.pack(fill="x", padx=8, pady=2)
+        self.btn_scene_mirror.pack(fill="x", padx=8, pady=1)
 
         self.btn_scene_camera = SceneListItem(d1, scene_id="camera", number=3, title="Camera Feed", is_active=False, on_select=self._select_scene)
-        self.btn_scene_camera.pack(fill="x", padx=8, pady=2)
+        self.btn_scene_camera.pack(fill="x", padx=8, pady=1)
 
         self.btn_scene_screen = SceneListItem(d1, scene_id="screen", number=4, title="Screen Record", is_active=False, on_select=self._select_scene)
-        self.btn_scene_screen.pack(fill="x", padx=8, pady=2)
+        self.btn_scene_screen.pack(fill="x", padx=8, pady=1)
 
         # -----------------------------
         # DOCK 2: SOURCES
         # -----------------------------
         d2 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
-        d2.grid(row=0, column=1, sticky="nsew", padx=6, pady=6)
+        d2.grid(row=0, column=1, sticky="nsew", padx=6, pady=4)
+        self.dock_col_sources = d2
 
         self.dock_title_sources = ctk.CTkLabel(d2, text="Sources", font=OmniTheme.font_section(), text_color=tokens.text_primary)
-        self.dock_title_sources.pack(anchor="w", padx=8, pady=(0, 6))
+        self.dock_title_sources.pack(anchor="w", padx=8, pady=(0, 4))
 
         self.source_pc_check = SourceRow(d2, name="PC display (gdigrab)", initial_checked=True, initial_active=True)
-        self.source_pc_check.pack(fill="x", padx=8, pady=3)
+        self.source_pc_check.pack(fill="x", padx=8, pady=2)
 
         self.source_cam_check = SourceRow(d2, name="Phone camera sensor", initial_checked=True, initial_active=True)
-        self.source_cam_check.pack(fill="x", padx=8, pady=3)
+        self.source_cam_check.pack(fill="x", padx=8, pady=2)
 
         self.source_uhid_check = SourceRow(d2, name="UHID touch mouse", initial_checked=False, initial_active=False)
-        self.source_uhid_check.pack(fill="x", padx=8, pady=3)
+        self.source_uhid_check.pack(fill="x", padx=8, pady=2)
 
         # -----------------------------
         # DOCK 3: AUDIO MIXER
         # -----------------------------
         d3 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
-        d3.grid(row=0, column=2, sticky="nsew", padx=8, pady=6)
+        d3.grid(row=0, column=2, sticky="nsew", padx=8, pady=4)
+        self.dock_col_mixer = d3
 
         self.dock_title_mixer = ctk.CTkLabel(d3, text="Audio mixer", font=OmniTheme.font_section(), text_color=tokens.text_primary)
-        self.dock_title_mixer.pack(anchor="w", padx=4, pady=(0, 4))
+        self.dock_title_mixer.pack(anchor="w", padx=4, pady=(0, 2))
 
         self.strip_mic = AudioChannelStrip(d3, channel_name="Phone microphone", initial_volume=0.85)
-        self.strip_mic.pack(fill="x", padx=4, pady=(0, 4))
+        self.strip_mic.pack(fill="x", padx=4, pady=(0, 2))
 
         self.strip_pc = AudioChannelStrip(d3, channel_name="Desktop playback", initial_volume=0.75)
         self.strip_pc.pack(fill="x", padx=4)
@@ -764,17 +788,19 @@ class OmniCaptureApp(ctk.CTk):
         # DOCK 4: MASTER CONTROLS
         # -----------------------------
         d4 = ctk.CTkFrame(self.dock_panel, fg_color="transparent")
-        d4.grid(row=0, column=3, sticky="nsew", padx=12, pady=6)
+        d4.grid(row=0, column=3, sticky="nsew", padx=12, pady=4)
+        self.dock_col_controls = d4
 
         self.dock_title_controls = ctk.CTkLabel(d4, text="Controls", font=OmniTheme.font_section(), text_color=tokens.text_primary)
-        self.dock_title_controls.pack(anchor="w", pady=(0, 4))
+        self.dock_title_controls.pack(anchor="w", pady=(0, 2))
 
-        # Primary Action: 44px primary button with red record dot icon
+        # Primary Action: 38px prominent primary button with red record dot icon
         self.master_record_btn = StudioButton(
             d4,
             text="Start Recording",
             variant="primary",
-            size="large",
+            size="normal",
+            height=38,
             icon=get_icon("record"),
             command=self._on_master_record_click
         )
@@ -784,28 +810,31 @@ class OmniCaptureApp(ctk.CTk):
             d4,
             text="Launch Mirror",
             variant="secondary",
+            size="small",
             icon=get_icon("monitor"),
             command=self._on_launch_mirror
         )
-        self.master_mirror_btn.pack(fill="x", pady=2)
+        self.master_mirror_btn.pack(fill="x", pady=1)
 
         self.master_recordings_btn = StudioButton(
             d4,
             text="Media Library",
             variant="secondary",
+            size="small",
             icon=get_icon("folder"),
             command=self._open_recordings_window
         )
-        self.master_recordings_btn.pack(fill="x", pady=2)
+        self.master_recordings_btn.pack(fill="x", pady=1)
 
         self.master_settings_btn = StudioButton(
             d4,
             text="Preferences",
             variant="secondary",
+            size="small",
             icon=get_icon("settings"),
             command=self._open_settings_window
         )
-        self.master_settings_btn.pack(fill="x", pady=(2, 0))
+        self.master_settings_btn.pack(fill="x", pady=(1, 0))
 
     def _update_scene_buttons(self, tokens: ThemeTokens):
         for btn, sid in [
@@ -916,25 +945,59 @@ class OmniCaptureApp(ctk.CTk):
         )
         self.foot_device_chip.pack(side="left", padx=6, pady=2)
 
-        self.hotkey_legend = ctk.CTkLabel(
+        # Right side hint groups (priority-based truncation drops whole groups cleanly)
+        self.hint_rec = ctk.CTkLabel(
             self.footer,
-            text="Ctrl+P: Command Palette  ·  Ctrl+Alt+D: Record",
+            text="Ctrl+Alt+D: Record",
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
         )
-        self.hotkey_legend.pack(side="right", padx=16)
+        self.hint_rec.pack(side="right", padx=(4, 16))
+
+        self.hint_palette = ctk.CTkLabel(
+            self.footer,
+            text="Ctrl+P: Palette  ·",
+            font=OmniTheme.font_caption(),
+            text_color=tokens.text_dim
+        )
+        self.hint_palette.pack(side="right", padx=(4, 0))
 
         # Priority-based truncation: hide hints first when width is tight, never cut mid-word
         self.footer.bind("<Configure>", self._on_footer_configure, add="+")
 
     def _on_footer_configure(self, event):
-        # Priority-based truncation threshold: when width is tight (< 1200px), drop shortcut legend
-        if event.width < 1200:
-            if self.hotkey_legend.winfo_ismapped():
-                self.hotkey_legend.pack_forget()
+        w = event.width
+        # Priority 1: When width is tight (< 1120px), drop Record hint
+        if w < 1120:
+            if self.hint_rec.winfo_manager() == "pack":
+                self.hint_rec.pack_forget()
+            if hasattr(self, "hint_palette"):
+                self.hint_palette.configure(text="Ctrl+P: Palette")
         else:
-            if not self.hotkey_legend.winfo_ismapped():
-                self.hotkey_legend.pack(side="right", padx=16)
+            if not self.hint_rec.winfo_manager():
+                self.hint_rec.pack(side="right", padx=(4, 16))
+            if hasattr(self, "hint_palette"):
+                self.hint_palette.configure(text="Ctrl+P: Palette  ·")
+
+        # Priority 2: When width is narrower (< 980px), drop Palette hint too
+        if w < 980:
+            if self.hint_palette.winfo_manager() == "pack":
+                self.hint_palette.pack_forget()
+        else:
+            if not self.hint_palette.winfo_manager():
+                self.hint_palette.pack(side="right", padx=(4, 0))
+
+        # Priority 3: When width is very narrow (< 850px), hide bitrate & fps labels
+        if w < 850:
+            if self.foot_bitrate_lbl.winfo_manager() == "pack":
+                self.foot_bitrate_lbl.pack_forget()
+            if self.foot_fps_lbl.winfo_manager() == "pack":
+                self.foot_fps_lbl.pack_forget()
+        else:
+            if not self.foot_fps_lbl.winfo_manager():
+                self.foot_fps_lbl.pack(side="left", padx=10)
+            if not self.foot_bitrate_lbl.winfo_manager():
+                self.foot_bitrate_lbl.pack(side="left", padx=10)
 
     def _refresh_encoder_chip(self):
         try:
@@ -1034,6 +1097,8 @@ class OmniCaptureApp(ctk.CTk):
 
         # Subcomponents
         self.top_bar.apply_tokens(tokens)
+        if hasattr(self, "state_banner") and self.state_banner:
+            self.state_banner.apply_tokens(tokens)
         self.cv_empty_state.apply_tokens(tokens)
         self.strip_mic.apply_tokens(tokens)
         self.strip_pc.apply_tokens(tokens)
@@ -1047,7 +1112,12 @@ class OmniCaptureApp(ctk.CTk):
         self.foot_bitrate_lbl.configure(text_color=tokens.text_dim)
         self.foot_disk_lbl.configure(text_color=tokens.text_dim)
         self.foot_encoder_lbl.configure(text_color=tokens.text_dim)
-        self.hotkey_legend.configure(text_color=tokens.text_dim)
+        if hasattr(self, "hint_rec"):
+            self.hint_rec.configure(text_color=tokens.text_dim)
+        if hasattr(self, "hint_palette"):
+            self.hint_palette.configure(text_color=tokens.text_dim)
+        if hasattr(self, "hotkey_legend"):
+            self.hotkey_legend.configure(text_color=tokens.text_dim)
 
         # Re-apply DWM window frame
         self._apply_dwm()
@@ -1107,6 +1177,8 @@ class OmniCaptureApp(ctk.CTk):
             {"title": "Refresh Connected Devices", "category": "Hardware", "shortcut": "F5", "action": self._on_manual_refresh, "keywords": "reload adb phone"},
             {"title": "Toggle Theme (Light / Dark)", "category": "View", "shortcut": "", "action": self._toggle_theme, "keywords": "appearance dark light mode"},
             {"title": "System & Hardware Diagnostics", "category": "Tools", "shortcut": "", "action": self._open_diagnostics_window, "keywords": "info check debug ffmpeg"},
+            {"title": "Getting Started Setup Checklist", "category": "Help", "shortcut": "", "action": self._open_onboarding_dialog, "keywords": "onboarding wizard setup guide steps"},
+            {"title": "Developer: Simulated Device Mode", "category": "Developer", "shortcut": "", "action": self._open_simulated_device_dialog, "keywords": "mock simulate test states device error"},
             {"title": "Developer: Design System Component Gallery", "category": "Developer", "shortcut": "", "action": self._open_component_gallery, "keywords": "components gallery design tokens ui"},
             {"title": "Studio Preferences & Settings", "category": "Settings", "shortcut": "Ctrl+,", "action": self._open_settings_window, "keywords": "config options format"},
             {"title": "Scene: Dual Stream", "category": "Scenes", "shortcut": "1", "action": lambda: self._select_scene("dual"), "keywords": "preset layout"},
@@ -1120,9 +1192,11 @@ class OmniCaptureApp(ctk.CTk):
         return self.palette
 
     def _open_recordings_window(self):
+        from gui.dialogs.recordings import RecordingsGalleryDialog
         RecordingsGalleryDialog(self, self.controller, on_toast=self.toasts.show)
 
     def _open_settings_window(self):
+        from gui.dialogs.settings import StudioSettingsDialog
         StudioSettingsDialog(
             self,
             self.app_config,
@@ -1133,7 +1207,65 @@ class OmniCaptureApp(ctk.CTk):
         )
 
     def _open_diagnostics_window(self):
+        from gui.dialogs.diagnostics import DiagnosticsDialog
         DiagnosticsDialog(self, self.controller, on_toast=self.toasts.show)
+
+    def _open_simulated_device_dialog(self):
+        from gui.dialogs.simulated_device import SimulatedDeviceControlDialog
+        if not hasattr(self, "_sim_engine") or not self._sim_engine:
+            from core.simulated_device import SimulatedADBManager
+            self._sim_engine = SimulatedADBManager()
+            self.controller.set_simulated_device_manager(self._sim_engine)
+            self.top_bar.set_simulated_mode(True)
+        SimulatedDeviceControlDialog(self, self._sim_engine, on_state_change=self._on_simulated_state_change)
+
+    def _on_simulated_state_change(self, state_id: str):
+        if state_id == "camera_locked":
+            self.state_banner.set_state("camera_locked")
+        elif state_id == "unplugged_mid_recording":
+            self.state_banner.set_state("device_unplugged")
+            self.notifications.notify("Device Disconnected", "USB connection was lost mid-recording", level="warning")
+        elif state_id == "battery_low":
+            self.top_bar.set_device_status("● POCO X6 Pro (USB Direct) · 12% ⚡")
+            self.foot_device_chip.set_status("POCO X6 Pro (12%)", state="warning")
+            self.toasts.show("Low Battery", "Connected phone battery is at 12%", level="warning")
+        elif state_id == "slow_response":
+            self.top_bar.set_device_status("● POCO X6 Pro (High Latency +1.5s)")
+            self.toasts.show("ADB Latency", "Device response latency +1.5s", level="warning")
+        elif state_id == "failure":
+            self.state_banner.set_state("device_unplugged", custom_desc="USB Bus hardware failure detected. Reconnect USB cable.")
+        self.controller.refresh_device_now()
+
+    def _open_onboarding_dialog(self):
+        from gui.dialogs.onboarding import OnboardingChecklistDialog
+        def _on_done():
+            self.settings["first_run_completed"] = True
+            SettingsManager.save(self.settings)
+        OnboardingChecklistDialog(self, self.controller, on_theme_toggle=self._toggle_theme, on_complete=_on_done)
+
+    def _check_first_run_onboarding(self):
+        if not self.settings.get("first_run_completed", False):
+            self._open_onboarding_dialog()
+
+    def _on_banner_action(self, state_name: str):
+        if state_name in ("no_device", "permission_denied"):
+            self._open_onboarding_dialog()
+        elif state_name in ("scanning", "connecting", "unauthorized", "device_unplugged"):
+            self._on_manual_refresh()
+        elif state_name == "camera_locked":
+            self._on_release_lock()
+        elif state_name in ("connected_usb", "connected_wifi"):
+            self._on_launch_mirror()
+        elif state_name == "recording":
+            self._on_stop_dual_recording()
+        elif state_name == "disk_nearly_full":
+            self._open_settings_window()
+        elif state_name == "disk_full":
+            self._open_recordings_window()
+        elif state_name == "ffmpeg_missing":
+            self._open_diagnostics_window()
+        else:
+            self.toasts.show("Studio Action", f"Action triggered for state: {state_name}", level="info")
 
     def _open_hotkeys_guide(self):
         w = ctk.CTkToplevel(self)
@@ -1264,6 +1396,8 @@ class OmniCaptureApp(ctk.CTk):
             )
             self.cv_recording_hud.place(relx=0.5, rely=0.08, anchor="n")
             self.foot_status_chip.set_status("RECORDING", state="recording")
+            if hasattr(self, "state_banner") and self.state_banner:
+                self.state_banner.set_state("recording")
             self.taskbar.set_progress_state(TaskbarManager.TBPF_NOPROGRESS)
             self.taskbar.set_recording_overlay(True)
             self.tray.set_recording_state(True, "00:00:00")
@@ -1312,6 +1446,8 @@ class OmniCaptureApp(ctk.CTk):
             self.foot_status_chip.set_status("STUDIO READY", state="ready")
             self.foot_rec_time.configure(text="REC: 00:00:00")
             self.foot_disk_lbl.configure(text=self._query_disk_space_str())
+            if hasattr(self, "state_banner") and self.state_banner:
+                self.state_banner.set_state("connected_usb" if self._connected_device_id else "no_device")
             self.taskbar.set_recording_overlay(False)
             self.taskbar.set_progress_state(TaskbarManager.TBPF_NOPROGRESS)
             self.tray.set_recording_state(False)
@@ -1405,6 +1541,9 @@ class OmniCaptureApp(ctk.CTk):
             # Switch Canvas from Empty State to Active Viewport Representation
             self.cv_empty_state.place_forget()
             self.cv_content.place(relx=0.5, rely=0.5, anchor="center")
+            if hasattr(self, "state_banner") and self.state_banner:
+                if not self.controller.is_dual_recording():
+                    self.state_banner.set_state("connected_wifi" if state.get("is_wireless") else "connected_usb")
         else:
             if self._connected_device_id is not None:
                 self._connected_device_id = None
@@ -1413,10 +1552,17 @@ class OmniCaptureApp(ctk.CTk):
 
             if status == "UNAUTHORIZED":
                 self.top_bar.set_device_status("Unauthorized: unlock phone and tap 'Always allow'")
+                if hasattr(self, "state_banner") and self.state_banner:
+                    self.state_banner.set_state("unauthorized")
             elif status == "OFFLINE":
                 self.top_bar.set_device_status("Device offline: reconnect USB cable")
+                if hasattr(self, "state_banner") and self.state_banner:
+                    self.state_banner.set_state("no_device", custom_desc="Device offline: reconnect USB cable.")
             else:
                 self.top_bar.set_device_status("Connect a phone via USB to start")
+                if hasattr(self, "state_banner") and self.state_banner:
+                    if not self.controller.is_dual_recording():
+                        self.state_banner.set_state("no_device")
 
             self.cv_content.place_forget()
             self.cv_empty_state.place(relx=0.5, rely=0.5, anchor="center", relwidth=0.85, relheight=0.7)

@@ -191,7 +191,9 @@ class ThemeTokens:
             ("stage_text_muted on bg_stage", self.stage_text_muted, self.bg_stage, 4.5),
             ("stage_text_dim on bg_stage", self.stage_text_dim, self.bg_stage, 3.0),
             ("stage_border_card on bg_stage", self.stage_border_card, self.bg_stage, 1.5),
-            ("text_primary on accent_subtle", self.text_primary, self.accent_subtle, 4.5)
+            ("text_primary on accent_subtle", self.text_primary, self.accent_subtle, 4.5),
+            ("border_button on bg_panel", self.border_button, self.bg_panel, 1.6),
+            ("border_button on bg_raised", self.border_button, self.bg_raised, 1.5)
         ]
         results = {}
         for name, c1, c2, req in checks:
@@ -352,6 +354,7 @@ class OmniTheme:
     RADIUS_PANEL = 12
     RADIUS_CARD = 8
     RADIUS_POPUP = 8
+    RADIUS_PILL = 12
 
     # Backward compatibility aliases
     SPACE_XS = 4
