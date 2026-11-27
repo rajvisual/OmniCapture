@@ -2,36 +2,47 @@ import customtkinter as ctk
 
 class OmniTheme:
     """
-    Windows 11 Fluent Dark Palette & Typography for OmniCapture.
+    Refined, minimalist design system for OmniCapture.
+    Eliminates decorative visual noise in favor of content clarity, clean whitespace, and typography.
     """
-    # Backgrounds
-    BG_ROOT = "#0D0F17"          # Deep obsidian black
-    BG_CARD = "#171A24"          # Card background
-    BG_CARD_HOVER = "#1E2230"    # Hover surface
-    BG_CARD_BORDER = "#282C3D"   # Subtle divider border
-    BG_INPUT = "#1F2332"         # Input & dropdown background
+    # Neutral Surfaces
+    BG_ROOT = "#121214"
+    BG_CARD = "#18181B"
+    BG_CARD_HOVER = "#232326"
+    BG_CARD_BORDER = "#27272A"
+    BG_INPUT = "#1F2024"
 
-    # Accent Colors
-    ACCENT_CYAN = "#00D2FF"      # Electric cyan (Primary)
-    ACCENT_CYAN_HOVER = "#00B4DB"# Cyan hover
-    ACCENT_GREEN = "#00E676"     # Emerald neon (Connected / Success)
-    ACCENT_GREEN_HOVER = "#00C853"
-    ACCENT_RED = "#FF3366"       # Crimson red (Recording / Stop / Error)
-    ACCENT_RED_HOVER = "#E02856"
-    ACCENT_AMBER = "#FFB300"     # Amber gold (Warning / Battery)
-    ACCENT_PURPLE = "#7C4DFF"    # Deep violet (Special / Dual Hero)
-    ACCENT_PURPLE_HOVER = "#651FFF"
+    # Restrained Primary Interactive Accent
+    ACCENT_PRIMARY = "#2563EB"
+    ACCENT_PRIMARY_HOVER = "#1D4ED8"
 
-    # Typography / Text Colors
-    TEXT_MAIN = "#FFFFFF"        # Primary headers & bold text
-    TEXT_BODY = "#E2E8F0"        # Standard body text
-    TEXT_MUTED = "#94A3B8"       # Secondary captions & hints
-    TEXT_DIM = "#64748B"         # Dimmed indicators
+    # Functional Semantic Colors (Only used for true state feedback)
+    STATUS_CONNECTED = "#10B981"
+    STATUS_DISCONNECTED = "#71717A"
+    STATUS_WARNING = "#F59E0B"
+    STATUS_RECORDING = "#EF4444"
+    STATUS_RECORDING_HOVER = "#DC2626"
 
-    # Status Colors
-    STATUS_CONNECTED = "#00E676"
-    STATUS_DISCONNECTED = "#FFB300"
-    STATUS_RECORDING = "#FF3366"
+    # Typography
+    TEXT_MAIN = "#F4F4F5"
+    TEXT_BODY = "#D4D4D8"
+    TEXT_MUTED = "#A1A1AA"
+    TEXT_DIM = "#71717A"
+
+    # Standard Control Corner Radius (Clean, consistent 6-8px; no exaggerated pills)
+    RADIUS_CONTROL = 6
+    RADIUS_CARD = 8
+
+    # Backward compatibility aliases for existing references
+    ACCENT_CYAN = ACCENT_PRIMARY
+    ACCENT_CYAN_HOVER = ACCENT_PRIMARY_HOVER
+    ACCENT_GREEN = STATUS_CONNECTED
+    ACCENT_GREEN_HOVER = "#059669"
+    ACCENT_RED = STATUS_RECORDING
+    ACCENT_RED_HOVER = STATUS_RECORDING_HOVER
+    ACCENT_AMBER = STATUS_WARNING
+    ACCENT_PURPLE = ACCENT_PRIMARY
+    ACCENT_PURPLE_HOVER = ACCENT_PRIMARY_HOVER
     STATUS_OFFLINE = "#EF4444"
 
     @classmethod

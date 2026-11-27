@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import subprocess
+import threading
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -16,7 +17,9 @@ from core.resource_path import resolve_resource, get_base_dir, get_recordings_di
 
 class OmniCaptureApp(ctk.CTk):
     """
-    OmniCapture Modern Windows 11 Dark Mode Desktop Dashboard.
+    OmniCapture Modern Desktop Dashboard.
+    Clean, restrained design adhering to high-craft human interface guidelines:
+    no pill spam, no all-caps subtitles, no nested boxed borders, and clean typography.
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -27,9 +30,9 @@ class OmniCaptureApp(ctk.CTk):
 
         # Window styling & geometry
         OmniTheme.apply_appearance()
-        self.title("OmniCapture — High-Performance Android & PC Desktop Capture Suite")
-        self.geometry("1120x760")
-        self.minsize(980, 640)
+        self.title("OmniCapture")
+        self.geometry("1080x720")
+        self.minsize(940, 600)
         self.configure(fg_color=OmniTheme.BG_ROOT)
 
         # Set window icon
@@ -51,7 +54,7 @@ class OmniCaptureApp(ctk.CTk):
         self.hotkeys = GlobalHotkeyManager(root_window=self)
         self._setup_hotkeys()
 
-        # Build UI layout
+        # Build clean UI layout
         self._build_header()
         self._build_tabs()
         self._build_footer()
@@ -67,7 +70,7 @@ class OmniCaptureApp(ctk.CTk):
             self.hotkeys.start()
 
         # Initial device refresh
-        self.after(300, self._initial_refresh)
+        self.after(250, self._initial_refresh)
 
     def _set_app_icon(self):
         """Set native window icon."""
@@ -79,151 +82,116 @@ class OmniCaptureApp(ctk.CTk):
                 pass
 
     # -------------------------------------------------------------------------
-    # Layout Builders
+    # Layout: Header
     # -------------------------------------------------------------------------
 
     def _build_header(self):
-        """Top Header: Branding, Live Device Pill, Battery & Action Buttons."""
+        """Clean top bar: App title, natural device status text, and quiet action buttons."""
         header_frame = ctk.CTkFrame(
             self,
             fg_color=OmniTheme.BG_CARD,
-            corner_radius=12,
-            border_width=1,
-            border_color=OmniTheme.BG_CARD_BORDER
+            corner_radius=OmniTheme.RADIUS_CARD,
+            border_width=0
         )
-        header_frame.pack(fill="x", padx=16, pady=(12, 8))
+        header_frame.pack(fill="x", padx=16, pady=(14, 8))
 
-        # Brand column
+        # Brand / Title
         brand_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-        brand_frame.pack(side="left", padx=16, pady=10)
+        brand_frame.pack(side="left", padx=16, pady=12)
 
-        # Brand logo
         logo_path = resolve_resource("assets/logo/omnicapture-icon.png")
         if logo_path.is_file():
             try:
-                pil_img = Image.open(str(logo_path)).resize((34, 34), Image.Resampling.LANCZOS)
-                self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(34, 34))
+                pil_img = Image.open(str(logo_path)).resize((28, 28), Image.Resampling.LANCZOS)
+                self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(28, 28))
                 logo_lbl = ctk.CTkLabel(brand_frame, image=self.logo_ctk, text="")
                 logo_lbl.pack(side="left", padx=(0, 10))
             except Exception:
                 pass
 
-        titles_col = ctk.CTkFrame(brand_frame, fg_color="transparent")
-        titles_col.pack(side="left")
-
-        title_row = ctk.CTkFrame(titles_col, fg_color="transparent")
-        title_row.pack(anchor="w")
-
         title_lbl = ctk.CTkLabel(
-            title_row,
+            brand_frame,
             text="OmniCapture",
-            font=ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=17, weight="bold"),
             text_color=OmniTheme.TEXT_MAIN
         )
-        title_lbl.pack(side="left", padx=(0, 8))
+        title_lbl.pack(side="left")
 
-        badge_lbl = ctk.CTkLabel(
-            title_row,
-            text="v1.2.0-production",
-            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
-            fg_color=OmniTheme.BG_CARD_BORDER,
-            text_color=OmniTheme.ACCENT_CYAN,
-            corner_radius=6,
-            padx=6,
-            pady=2
+        ver_lbl = ctk.CTkLabel(
+            brand_frame,
+            text="1.2.0",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=OmniTheme.TEXT_DIM
         )
-        badge_lbl.pack(side="left")
+        ver_lbl.pack(side="left", padx=(8, 0))
 
-        sub_lbl = ctk.CTkLabel(
-            titles_col,
-            text="High-Performance Android & PC Desktop Capture Suite",
-            font=ctk.CTkFont(family="Segoe UI", size=11),
+        # Right telemetry & controls (no pill shapes, no heavy borders)
+        status_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        status_frame.pack(side="right", padx=16, pady=12)
+
+        self.device_status_lbl = ctk.CTkLabel(
+            status_frame,
+            text="Searching for device...",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=OmniTheme.TEXT_MUTED
         )
-        sub_lbl.pack(anchor="w")
+        self.device_status_lbl.pack(side="left", padx=(0, 16))
 
-        # Right status & quick actions column
-        status_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-        status_frame.pack(side="right", padx=16, pady=10)
-
-        # Connection badge pill
-        self.device_pill = ctk.CTkLabel(
-            status_frame,
-            text="○ Searching for device...",
-            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            text_color=OmniTheme.STATUS_DISCONNECTED,
-            fg_color=OmniTheme.BG_INPUT,
-            corner_radius=16,
-            padx=14,
-            pady=6
-        )
-        self.device_pill.pack(side="left", padx=6)
-
-        # Battery pill
-        self.battery_pill = ctk.CTkLabel(
-            status_frame,
-            text="🔋 --%",
-            font=ctk.CTkFont(family="Segoe UI", size=12),
-            text_color=OmniTheme.TEXT_MUTED,
-            fg_color=OmniTheme.BG_INPUT,
-            corner_radius=16,
-            padx=10,
-            pady=6
-        )
-        self.battery_pill.pack(side="left", padx=6)
-
-        # Quick Refresh Button
         self.refresh_btn = ctk.CTkButton(
             status_frame,
-            text="🔄 Refresh",
-            width=80,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text="Refresh",
+            width=70,
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
             fg_color=OmniTheme.BG_INPUT,
             hover_color=OmniTheme.BG_CARD_HOVER,
             text_color=OmniTheme.TEXT_MAIN,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_manual_refresh
         )
         self.refresh_btn.pack(side="left", padx=4)
 
-        # Release Camera Lock Button
         self.lock_btn = ctk.CTkButton(
             status_frame,
-            text="🔓 Release Camera Lock",
-            width=140,
-            height=32,
-            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text="Release camera lock",
+            width=135,
+            height=28,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
             fg_color=OmniTheme.BG_INPUT,
             hover_color=OmniTheme.BG_CARD_HOVER,
-            text_color=OmniTheme.ACCENT_AMBER,
+            text_color=OmniTheme.TEXT_MUTED,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_release_lock
         )
         self.lock_btn.pack(side="left", padx=4)
 
+    # -------------------------------------------------------------------------
+    # Layout: Tab Navigation
+    # -------------------------------------------------------------------------
+
     def _build_tabs(self):
-        """Build the Tabview containing the 6 application cards/modes."""
+        """Tabbed workspace without emoji noise or nested boxed containers."""
         self.tabs = ctk.CTkTabview(
             self,
             fg_color=OmniTheme.BG_ROOT,
             segmented_button_fg_color=OmniTheme.BG_CARD,
-            segmented_button_selected_color=OmniTheme.ACCENT_CYAN,
-            segmented_button_selected_hover_color=OmniTheme.ACCENT_CYAN_HOVER,
+            segmented_button_selected_color=OmniTheme.ACCENT_PRIMARY,
+            segmented_button_selected_hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
             segmented_button_unselected_color=OmniTheme.BG_CARD,
             segmented_button_unselected_hover_color=OmniTheme.BG_CARD_HOVER,
             text_color=OmniTheme.TEXT_MAIN,
-            corner_radius=12
+            corner_radius=OmniTheme.RADIUS_CARD
         )
         self.tabs.pack(fill="both", expand=True, padx=16, pady=(0, 8))
 
-        # Add tabs
-        self.tab_dual = self.tabs.add("🎬 Dual Recording (Hero)")
-        self.tab_mirror = self.tabs.add("📱 Display Mirror & Control")
-        self.tab_camera = self.tabs.add("📷 Stealth Camera")
-        self.tab_wireless = self.tabs.add("📶 Wireless & Diagnostics")
-        self.tab_gallery = self.tabs.add("📁 Recordings Gallery")
-        self.tab_settings = self.tabs.add("⚙️ Settings & Cloud")
+        # Clean tab labels (no emoji icons in headers)
+        self.tab_dual = self.tabs.add("Dual Recording")
+        self.tab_mirror = self.tabs.add("Screen Mirror")
+        self.tab_camera = self.tabs.add("Camera")
+        self.tab_wireless = self.tabs.add("Diagnostics")
+        self.tab_gallery = self.tabs.add("Recordings")
+        self.tab_settings = self.tabs.add("Settings")
 
-        # Build each tab's contents
         self._build_dual_recording_tab()
         self._build_mirror_tab()
         self._build_camera_tab()
@@ -232,219 +200,191 @@ class OmniCaptureApp(ctk.CTk):
         self._build_settings_tab()
 
     # -------------------------------------------------------------------------
-    # TAB 1: Dual Simultaneous Recording (Creator Hero Mode)
+    # Tab 1: Dual Simultaneous Recording
     # -------------------------------------------------------------------------
 
     def _build_dual_recording_tab(self):
         tab = self.tab_dual
 
-        # Main Hero Card
-        hero_card = ctk.CTkFrame(
+        card = ctk.CTkFrame(
             tab,
             fg_color=OmniTheme.BG_CARD,
-            corner_radius=12,
-            border_width=2,
-            border_color=OmniTheme.ACCENT_PURPLE
+            corner_radius=OmniTheme.RADIUS_CARD,
+            border_width=0
         )
-        hero_card.pack(fill="x", padx=10, pady=10)
+        card.pack(fill="x", padx=10, pady=10)
 
-        # Hero Header Banner
-        banner_row = ctk.CTkFrame(hero_card, fg_color="transparent")
-        banner_row.pack(fill="x", padx=18, pady=(16, 8))
+        # Title & Subtitle
+        header_row = ctk.CTkFrame(card, fg_color="transparent")
+        header_row.pack(fill="x", padx=20, pady=(18, 6))
 
-        hero_icon_lbl = ctk.CTkLabel(
-            banner_row,
-            text="🎬",
-            font=ctk.CTkFont(size=26)
-        )
-        hero_icon_lbl.pack(side="left", padx=(0, 10))
-
-        hero_titles = ctk.CTkFrame(banner_row, fg_color="transparent")
-        hero_titles.pack(side="left")
-
-        hero_title = ctk.CTkLabel(
-            hero_titles,
-            text="Dual Simultaneous Recording (PC Desktop + Mobile Camera)",
-            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+        title = ctk.CTkLabel(
+            header_row,
+            text="Dual Recording",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
             text_color=OmniTheme.TEXT_MAIN
         )
-        hero_title.pack(anchor="w")
+        title.pack(anchor="w")
 
-        hero_desc = ctk.CTkLabel(
-            hero_titles,
-            text="Concurrently captures your PC desktop screen (via FFmpeg) and your smartphone camera (via scrcpy) into 2 separate files.",
+        subtitle = ctk.CTkLabel(
+            header_row,
+            text="Record PC desktop and mobile camera concurrently into separate video files",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=OmniTheme.TEXT_MUTED
         )
-        hero_desc.pack(anchor="w")
+        subtitle.pack(anchor="w")
 
-        # Configuration Grid
-        cfg_frame = ctk.CTkFrame(
-            hero_card,
-            fg_color=OmniTheme.BG_INPUT,
-            corner_radius=10,
-            border_width=1,
-            border_color=OmniTheme.BG_CARD_BORDER
-        )
-        cfg_frame.pack(fill="x", padx=18, pady=10)
+        # Form Controls (Natural grouping, no redundant borders)
+        form_frame = ctk.CTkFrame(card, fg_color="transparent")
+        form_frame.pack(fill="x", padx=20, pady=12)
 
-        # Row 1: Camera Sensor, PC FPS, Cam FPS, Format
-        row1 = ctk.CTkFrame(cfg_frame, fg_color="transparent")
-        row1.pack(fill="x", padx=14, pady=10)
+        # Row 1: Pickers
+        row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 12))
 
-        # Mobile camera facing
-        f_lbl = ctk.CTkLabel(row1, text="Mobile Camera:", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_BODY)
-        f_lbl.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(row1, text="Camera", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.dual_facing_seg = ctk.CTkSegmentedButton(
             row1,
-            values=["Back (Main Sensor)", "Front (Selfie)"],
-            selected_color=OmniTheme.ACCENT_CYAN,
-            selected_hover_color=OmniTheme.ACCENT_CYAN_HOVER
+            values=["Back", "Front"],
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            selected_hover_color=OmniTheme.ACCENT_PRIMARY_HOVER
         )
-        self.dual_facing_seg.set("Back (Main Sensor)")
+        self.dual_facing_seg.set("Back")
         self.dual_facing_seg.pack(side="left", padx=(0, 20))
 
-        # PC FPS
-        pc_fps_lbl = ctk.CTkLabel(row1, text="PC Screen FPS:", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_BODY)
-        pc_fps_lbl.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(row1, text="PC rate", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.dual_pc_fps_seg = ctk.CTkSegmentedButton(
             row1,
-            values=["30 FPS", "60 FPS"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["30 fps", "60 fps"],
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            selected_color=OmniTheme.ACCENT_PRIMARY
         )
-        self.dual_pc_fps_seg.set("30 FPS")
+        self.dual_pc_fps_seg.set("30 fps")
         self.dual_pc_fps_seg.pack(side="left", padx=(0, 20))
 
-        # Camera FPS
-        cam_fps_lbl = ctk.CTkLabel(row1, text="Camera FPS:", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_BODY)
-        cam_fps_lbl.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(row1, text="Camera rate", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.dual_cam_fps_seg = ctk.CTkSegmentedButton(
             row1,
-            values=["30 FPS", "60 FPS"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["30 fps", "60 fps"],
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            selected_color=OmniTheme.ACCENT_PRIMARY
         )
-        self.dual_cam_fps_seg.set("30 FPS")
+        self.dual_cam_fps_seg.set("30 fps")
         self.dual_cam_fps_seg.pack(side="left", padx=(0, 20))
 
-        # Format
-        fmt_lbl = ctk.CTkLabel(row1, text="Format:", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_BODY)
-        fmt_lbl.pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(row1, text="Format", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.dual_fmt_seg = ctk.CTkSegmentedButton(
             row1,
             values=["MP4", "MKV"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            corner_radius=OmniTheme.RADIUS_CONTROL,
+            selected_color=OmniTheme.ACCENT_PRIMARY
         )
         self.dual_fmt_seg.set("MP4")
         self.dual_fmt_seg.pack(side="left")
 
-        # Row 2: Toggles
-        row2 = ctk.CTkFrame(cfg_frame, fg_color="transparent")
-        row2.pack(fill="x", padx=14, pady=(0, 10))
+        # Row 2: Clean Switches
+        row2 = ctk.CTkFrame(form_frame, fg_color="transparent")
+        row2.pack(fill="x", pady=(0, 4))
 
         self.dual_preview_var = ctk.BooleanVar(value=True)
         self.dual_preview_switch = ctk.CTkSwitch(
             row2,
-            text="Show live mobile camera preview window on PC",
+            text="Show camera preview",
             variable=self.dual_preview_var,
-            progress_color=OmniTheme.ACCENT_CYAN
+            progress_color=OmniTheme.ACCENT_PRIMARY
         )
         self.dual_preview_switch.pack(side="left", padx=(0, 24))
 
         self.dual_upload_var = ctk.BooleanVar(value=False)
         self.dual_upload_switch = ctk.CTkSwitch(
             row2,
-            text="Auto-upload both recordings to Google Drive when finished",
+            text="Upload to Google Drive when finished",
             variable=self.dual_upload_var,
-            progress_color=OmniTheme.ACCENT_GREEN
+            progress_color=OmniTheme.STATUS_CONNECTED
         )
         self.dual_upload_switch.pack(side="left")
 
-        # Action Container (Switches between Idle Start & Active Live Monitor)
-        self.dual_action_frame = ctk.CTkFrame(hero_card, fg_color="transparent")
-        self.dual_action_frame.pack(fill="x", padx=18, pady=(4, 16))
+        # Action Buttons
+        self.dual_action_frame = ctk.CTkFrame(card, fg_color="transparent")
+        self.dual_action_frame.pack(fill="x", padx=20, pady=(8, 18))
 
-        # Start Button (Idle)
         self.dual_start_btn = ctk.CTkButton(
             self.dual_action_frame,
-            text="🔴  START DUAL SIMULTANEOUS RECORDING",
-            height=48,
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-            fg_color=OmniTheme.ACCENT_RED,
-            hover_color=OmniTheme.ACCENT_RED_HOVER,
+            text="Start Dual Recording",
+            height=38,
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_start_dual_recording
         )
-        self.dual_start_btn.pack(fill="x")
+        self.dual_start_btn.pack(anchor="w", ipadx=16)
 
-        # Live Recording Card (Shown during recording)
-        self.dual_live_card = ctk.CTkFrame(
-            hero_card,
-            fg_color="#24141E",
-            corner_radius=10,
-            border_width=1,
-            border_color=OmniTheme.ACCENT_RED
-        )
+        # Active Recording State View
+        self.dual_live_card = ctk.CTkFrame(card, fg_color=OmniTheme.BG_INPUT, corner_radius=OmniTheme.RADIUS_CARD)
 
         live_row = ctk.CTkFrame(self.dual_live_card, fg_color="transparent")
         live_row.pack(fill="x", padx=16, pady=12)
 
         self.dual_timer_lbl = ctk.CTkLabel(
             live_row,
-            text="⏱  00:00:00",
-            font=ctk.CTkFont(family="Consolas", size=24, weight="bold"),
-            text_color=OmniTheme.ACCENT_RED
+            text="00:00:00",
+            font=ctk.CTkFont(family="Consolas", size=22, weight="bold"),
+            text_color=OmniTheme.STATUS_RECORDING
         )
-        self.dual_timer_lbl.pack(side="left", padx=(0, 24))
+        self.dual_timer_lbl.pack(side="left", padx=(0, 20))
 
         self.dual_stream_stats_lbl = ctk.CTkLabel(
             live_row,
-            text="Stream 1 [PC]: 0.00 MB  |  Stream 2 [Camera]: 0.00 MB",
-            font=ctk.CTkFont(family="Segoe UI", size=13),
+            text="PC screen: 0.00 MB  ·  Camera: 0.00 MB",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color=OmniTheme.TEXT_BODY
         )
         self.dual_stream_stats_lbl.pack(side="left")
 
         self.dual_stop_btn = ctk.CTkButton(
             live_row,
-            text="⏹  STOP & FINALIZE",
-            width=160,
-            height=38,
+            text="Stop Recording",
+            width=130,
+            height=34,
             font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
-            fg_color=OmniTheme.ACCENT_RED,
-            hover_color=OmniTheme.ACCENT_RED_HOVER,
+            fg_color=OmniTheme.STATUS_RECORDING,
+            hover_color=OmniTheme.STATUS_RECORDING_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_stop_dual_recording
         )
         self.dual_stop_btn.pack(side="right")
 
-        # Status / Feedback Card
+        # Clean Log View (No heavy borders or box-in-a-box)
         self.dual_feedback_frame = ctk.CTkFrame(
             tab,
             fg_color=OmniTheme.BG_CARD,
-            corner_radius=10,
-            border_width=1,
-            border_color=OmniTheme.BG_CARD_BORDER
+            corner_radius=OmniTheme.RADIUS_CARD,
+            border_width=0
         )
         self.dual_feedback_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
-        feedback_header = ctk.CTkLabel(
+        log_head = ctk.CTkLabel(
             self.dual_feedback_frame,
-            text="Dual Recording Status & Output Logs",
-            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text="Activity",
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
             text_color=OmniTheme.TEXT_MUTED
         )
-        feedback_header.pack(anchor="w", padx=16, pady=(10, 4))
+        log_head.pack(anchor="w", padx=16, pady=(12, 4))
 
         self.dual_log_box = ctk.CTkTextbox(
             self.dual_feedback_frame,
             fg_color=OmniTheme.BG_INPUT,
             text_color=OmniTheme.TEXT_BODY,
             font=ctk.CTkFont(family="Consolas", size=11),
-            corner_radius=8
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
-        self.dual_log_box.pack(fill="both", expand=True, padx=16, pady=(0, 12))
-        self.dual_log_box.insert("1.0", "Ready to start Dual Simultaneous Recording.\nPress 'START DUAL SIMULTANEOUS RECORDING' or hit global hotkey [Ctrl + Alt + D].\n")
+        self.dual_log_box.pack(fill="both", expand=True, padx=16, pady=(0, 14))
+        self.dual_log_box.insert("1.0", "Ready to record.\nUse the button above or press Ctrl+Alt+D.\n")
 
     # -------------------------------------------------------------------------
-    # TAB 2: Display Mirror & Control
+    # Tab 2: Screen Mirror
     # -------------------------------------------------------------------------
 
     def _build_mirror_tab(self):
@@ -456,84 +396,81 @@ class OmniCaptureApp(ctk.CTk):
         grid_frame.columnconfigure(1, weight=1)
         grid_frame.rowconfigure(0, weight=1)
 
-        # Card 1: Interactive Display Controller
-        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 1: Mirror & Control
+        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card1.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        c1_head = ctk.CTkLabel(card1, text="📱  Display Mirror & PC Controller", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c1_head.pack(anchor="w", padx=16, pady=(16, 4))
-        c1_desc = ctk.CTkLabel(card1, text="Mirror phone screen with full PC mouse & keyboard control at 60 FPS.", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        c1_desc.pack(anchor="w", padx=16, pady=(0, 14))
+        c1_head = ctk.CTkLabel(card1, text="Display Mirror", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c1_head.pack(anchor="w", padx=16, pady=(16, 12))
 
-        # Controls
-        ctrl_box = ctk.CTkFrame(card1, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        ctrl_box.pack(fill="x", padx=16, pady=6)
+        ctrl_box = ctk.CTkFrame(card1, fg_color="transparent")
+        ctrl_box.pack(fill="x", padx=16, pady=4)
 
-        ctk.CTkLabel(ctrl_box, text="Touch Input Mode:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
+        ctk.CTkLabel(ctrl_box, text="Touch mode", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
         self.mirror_mode_seg = ctk.CTkSegmentedButton(
             ctrl_box,
-            values=["Standard Touch", "Hardware Mouse (UHID POCO Bypass)"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["Standard Touch", "Hardware Mouse (UHID)"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
         self.mirror_mode_seg.set("Standard Touch")
-        self.mirror_mode_seg.pack(fill="x", padx=12, pady=(0, 10))
+        self.mirror_mode_seg.pack(fill="x", pady=(0, 10))
 
         self.mirror_screen_off_var = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(ctrl_box, text="Turn phone screen OFF to save heat & battery", variable=self.mirror_screen_off_var, progress_color=OmniTheme.ACCENT_CYAN).pack(anchor="w", padx=12, pady=6)
+        ctk.CTkSwitch(ctrl_box, text="Turn phone screen off during mirror", variable=self.mirror_screen_off_var, progress_color=OmniTheme.ACCENT_PRIMARY).pack(anchor="w", pady=6)
 
         self.mirror_awake_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(ctrl_box, text="Keep phone display awake while connected", variable=self.mirror_awake_var, progress_color=OmniTheme.ACCENT_CYAN).pack(anchor="w", padx=12, pady=(6, 12))
+        ctk.CTkSwitch(ctrl_box, text="Keep phone display awake while plugged in", variable=self.mirror_awake_var, progress_color=OmniTheme.ACCENT_PRIMARY).pack(anchor="w", pady=6)
 
-        # Mirror Launch Button
         self.mirror_launch_btn = ctk.CTkButton(
             card1,
-            text="📱  LAUNCH DISPLAY CONTROLLER",
-            height=44,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=OmniTheme.ACCENT_CYAN,
-            hover_color=OmniTheme.ACCENT_CYAN_HOVER,
-            text_color="#000000",
+            text="Launch Mirror",
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_launch_mirror
         )
-        self.mirror_launch_btn.pack(fill="x", padx=16, pady=(16, 16))
+        self.mirror_launch_btn.pack(anchor="w", padx=16, pady=(18, 16))
 
-        # Card 2: Record Screen -> PC
-        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 2: Mobile Screen Recording
+        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card2.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        c2_head = ctk.CTkLabel(card2, text="🔴  Direct Mobile Screen Recording", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c2_head.pack(anchor="w", padx=16, pady=(16, 4))
-        c2_desc = ctk.CTkLabel(card2, text="Stream and record mobile gameplay or apps directly to high-bitrate video file.", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        c2_desc.pack(anchor="w", padx=16, pady=(0, 14))
+        c2_head = ctk.CTkLabel(card2, text="Screen Recording", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c2_head.pack(anchor="w", padx=16, pady=(16, 12))
 
-        rec_box = ctk.CTkFrame(card2, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        rec_box.pack(fill="x", padx=16, pady=6)
+        rec_box = ctk.CTkFrame(card2, fg_color="transparent")
+        rec_box.pack(fill="x", padx=16, pady=4)
 
-        ctk.CTkLabel(rec_box, text="Format:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
+        ctk.CTkLabel(rec_box, text="Format", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
         self.screen_rec_fmt_seg = ctk.CTkSegmentedButton(
             rec_box,
-            values=["MP4 (Standard)", "MKV (Crash-Safe)"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["MP4", "MKV"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
-        self.screen_rec_fmt_seg.set("MP4 (Standard)")
-        self.screen_rec_fmt_seg.pack(fill="x", padx=12, pady=(0, 10))
+        self.screen_rec_fmt_seg.set("MP4")
+        self.screen_rec_fmt_seg.pack(fill="x", pady=(0, 10))
 
         self.screen_rec_upload_var = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(rec_box, text="Auto-upload to Google Drive when finished", variable=self.screen_rec_upload_var, progress_color=OmniTheme.ACCENT_GREEN).pack(anchor="w", padx=12, pady=(6, 12))
+        ctk.CTkSwitch(rec_box, text="Upload to Google Drive when finished", variable=self.screen_rec_upload_var, progress_color=OmniTheme.STATUS_CONNECTED).pack(anchor="w", pady=6)
 
         self.screen_rec_btn = ctk.CTkButton(
             card2,
-            text="🔴  START SCREEN RECORDING",
-            height=44,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=OmniTheme.ACCENT_RED,
-            hover_color=OmniTheme.ACCENT_RED_HOVER,
+            text="Start Screen Recording",
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_start_screen_recording
         )
-        self.screen_rec_btn.pack(fill="x", padx=16, pady=(16, 16))
+        self.screen_rec_btn.pack(anchor="w", padx=16, pady=(18, 16))
 
     # -------------------------------------------------------------------------
-    # TAB 3: Stealth Camera Stream & Recording
+    # Tab 3: Camera
     # -------------------------------------------------------------------------
 
     def _build_camera_tab(self):
@@ -545,91 +482,91 @@ class OmniCaptureApp(ctk.CTk):
         grid_frame.columnconfigure(1, weight=1)
         grid_frame.rowconfigure(0, weight=1)
 
-        # Card 1: Stealth Stream Viewfinder
-        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 1: Live Camera Feed
+        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card1.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        c1_head = ctk.CTkLabel(card1, text="📷  Stealth Camera Viewfinder", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c1_head.pack(anchor="w", padx=16, pady=(16, 4))
-        c1_desc = ctk.CTkLabel(card1, text="Direct raw sensor stream to PC window. Phone camera app NEVER opens.", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        c1_desc.pack(anchor="w", padx=16, pady=(0, 14))
+        c1_head = ctk.CTkLabel(card1, text="Camera Feed", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c1_head.pack(anchor="w", padx=16, pady=(16, 12))
 
-        box1 = ctk.CTkFrame(card1, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        box1.pack(fill="x", padx=16, pady=6)
+        box1 = ctk.CTkFrame(card1, fg_color="transparent")
+        box1.pack(fill="x", padx=16, pady=4)
 
-        ctk.CTkLabel(box1, text="Camera Sensor:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
+        ctk.CTkLabel(box1, text="Sensor", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
         self.cam_stream_facing_seg = ctk.CTkSegmentedButton(
             box1,
-            values=["Back (Standard)", "Front (Selfie)"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["Back", "Front"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
-        self.cam_stream_facing_seg.set("Back (Standard)")
-        self.cam_stream_facing_seg.pack(fill="x", padx=12, pady=(0, 10))
+        self.cam_stream_facing_seg.set("Back")
+        self.cam_stream_facing_seg.pack(fill="x", pady=(0, 10))
 
         self.cam_stream_mic_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(box1, text="Capture phone microphone audio", variable=self.cam_stream_mic_var, progress_color=OmniTheme.ACCENT_CYAN).pack(anchor="w", padx=12, pady=(6, 12))
+        ctk.CTkSwitch(box1, text="Capture microphone audio", variable=self.cam_stream_mic_var, progress_color=OmniTheme.ACCENT_PRIMARY).pack(anchor="w", pady=6)
 
         self.cam_stream_btn = ctk.CTkButton(
             card1,
-            text="📷  LAUNCH STEALTH VIEWFINDER",
-            height=44,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=OmniTheme.ACCENT_CYAN,
-            hover_color=OmniTheme.ACCENT_CYAN_HOVER,
-            text_color="#000000",
+            text="Launch Camera Feed",
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_launch_camera_stream
         )
-        self.cam_stream_btn.pack(fill="x", padx=16, pady=(16, 16))
+        self.cam_stream_btn.pack(anchor="w", padx=16, pady=(18, 16))
 
-        # Card 2: Record Camera -> PC
-        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 2: Camera Recording
+        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card2.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        c2_head = ctk.CTkLabel(card2, text="🎥  Record Mobile Camera -> PC File", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c2_head.pack(anchor="w", padx=16, pady=(16, 4))
-        c2_desc = ctk.CTkLabel(card2, text="Records camera stream directly into local MP4/MKV with audio.", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        c2_desc.pack(anchor="w", padx=16, pady=(0, 14))
+        c2_head = ctk.CTkLabel(card2, text="Camera Recording", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c2_head.pack(anchor="w", padx=16, pady=(16, 12))
 
-        box2 = ctk.CTkFrame(card2, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        box2.pack(fill="x", padx=16, pady=6)
+        box2 = ctk.CTkFrame(card2, fg_color="transparent")
+        box2.pack(fill="x", padx=16, pady=4)
 
-        ctk.CTkLabel(box2, text="Camera Sensor:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
+        ctk.CTkLabel(box2, text="Sensor", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(0, 4))
         self.cam_rec_facing_seg = ctk.CTkSegmentedButton(
             box2,
-            values=["Back (Standard)", "Front (Selfie)"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            values=["Back", "Front"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
-        self.cam_rec_facing_seg.set("Back (Standard)")
-        self.cam_rec_facing_seg.pack(fill="x", padx=12, pady=(0, 10))
+        self.cam_rec_facing_seg.set("Back")
+        self.cam_rec_facing_seg.pack(fill="x", pady=(0, 10))
 
-        ctk.CTkLabel(box2, text="Container Format:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=12, pady=(6, 4))
+        ctk.CTkLabel(box2, text="Format", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED).pack(anchor="w", pady=(6, 4))
         self.cam_rec_fmt_seg = ctk.CTkSegmentedButton(
             box2,
             values=["MP4", "MKV"],
-            selected_color=OmniTheme.ACCENT_CYAN
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
         self.cam_rec_fmt_seg.set("MP4")
-        self.cam_rec_fmt_seg.pack(fill="x", padx=12, pady=(0, 10))
+        self.cam_rec_fmt_seg.pack(fill="x", pady=(0, 10))
 
         self.cam_rec_preview_var = ctk.BooleanVar(value=True)
-        ctk.CTkSwitch(box2, text="Show live preview window on PC", variable=self.cam_rec_preview_var, progress_color=OmniTheme.ACCENT_CYAN).pack(anchor="w", padx=12, pady=6)
+        ctk.CTkSwitch(box2, text="Show live preview window", variable=self.cam_rec_preview_var, progress_color=OmniTheme.ACCENT_PRIMARY).pack(anchor="w", pady=6)
 
         self.cam_rec_upload_var = ctk.BooleanVar(value=False)
-        ctk.CTkSwitch(box2, text="Auto-upload to Google Drive", variable=self.cam_rec_upload_var, progress_color=OmniTheme.ACCENT_GREEN).pack(anchor="w", padx=12, pady=(6, 12))
+        ctk.CTkSwitch(box2, text="Upload to Google Drive", variable=self.cam_rec_upload_var, progress_color=OmniTheme.STATUS_CONNECTED).pack(anchor="w", pady=6)
 
         self.cam_rec_btn = ctk.CTkButton(
             card2,
-            text="🎥  START CAMERA RECORDING",
-            height=44,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=OmniTheme.ACCENT_RED,
-            hover_color=OmniTheme.ACCENT_RED_HOVER,
+            text="Start Camera Recording",
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_start_camera_recording
         )
-        self.cam_rec_btn.pack(fill="x", padx=16, pady=(16, 16))
+        self.cam_rec_btn.pack(anchor="w", padx=16, pady=(18, 16))
 
     # -------------------------------------------------------------------------
-    # TAB 4: Wireless ADB & Diagnostics
+    # Tab 4: Diagnostics & Wireless
     # -------------------------------------------------------------------------
 
     def _build_wireless_tab(self):
@@ -641,116 +578,106 @@ class OmniCaptureApp(ctk.CTk):
         grid_frame.columnconfigure(1, weight=1)
         grid_frame.rowconfigure(0, weight=1)
 
-        # Left Card: Wireless ADB
-        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 1: Wireless ADB
+        card1 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card1.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
 
-        c1_head = ctk.CTkLabel(card1, text="📶  Wireless ADB (Wi-Fi Capture)", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c1_head.pack(anchor="w", padx=16, pady=(16, 4))
-        c1_desc = ctk.CTkLabel(card1, text="Switch connected phone to Wi-Fi TCP/IP mode so you can unplug the USB cable.", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        c1_desc.pack(anchor="w", padx=16, pady=(0, 14))
+        c1_head = ctk.CTkLabel(card1, text="Wireless ADB", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c1_head.pack(anchor="w", padx=16, pady=(16, 8))
 
-        w_box = ctk.CTkFrame(card1, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        w_box.pack(fill="x", padx=16, pady=6)
+        w_box = ctk.CTkFrame(card1, fg_color="transparent")
+        w_box.pack(fill="x", padx=16, pady=4)
 
-        self.wifi_ip_lbl = ctk.CTkLabel(w_box, text="Phone Wi-Fi IP:  Scanning...", font=ctk.CTkFont(family="Segoe UI", size=13))
-        self.wifi_ip_lbl.pack(anchor="w", padx=12, pady=(12, 6))
-
-        w_instr = ctk.CTkLabel(
-            w_box,
-            text="HOW IT WORKS:\n1. Ensure phone & PC are on the SAME Wi-Fi network.\n2. Click the button below to enable TCP/IP port 5555.\n3. Unplug USB cable and enjoy wireless streaming!",
-            font=ctk.CTkFont(size=11),
-            text_color=OmniTheme.TEXT_MUTED,
-            justify="left"
-        )
-        w_instr.pack(anchor="w", padx=12, pady=(0, 12))
+        self.wifi_ip_lbl = ctk.CTkLabel(w_box, text="IP: Scanning...", font=ctk.CTkFont(family="Segoe UI", size=13))
+        self.wifi_ip_lbl.pack(anchor="w", pady=(4, 12))
 
         self.switch_wifi_btn = ctk.CTkButton(
             card1,
-            text="📶  SWITCH TO WIRELESS ADB",
-            height=44,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=OmniTheme.ACCENT_CYAN,
-            hover_color=OmniTheme.ACCENT_CYAN_HOVER,
-            text_color="#000000",
+            text="Switch to Wi-Fi ADB",
+            height=36,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=OmniTheme.ACCENT_PRIMARY,
+            hover_color=OmniTheme.ACCENT_PRIMARY_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_switch_to_wireless
         )
-        self.switch_wifi_btn.pack(fill="x", padx=16, pady=(16, 16))
+        self.switch_wifi_btn.pack(anchor="w", padx=16, pady=(8, 16))
 
-        # Right Card: Hardware & Camera Diagnostics
-        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        # Card 2: Hardware Diagnostics
+        card2 = ctk.CTkFrame(grid_frame, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card2.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        c2_head = ctk.CTkLabel(card2, text="🔍  Hardware & Camera Diagnostics", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c2_head.pack(anchor="w", padx=16, pady=(16, 4))
+        c2_head = ctk.CTkLabel(card2, text="Hardware Diagnostics", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c2_head.pack(anchor="w", padx=16, pady=(16, 8))
 
         self.diag_box = ctk.CTkTextbox(
             card2,
             fg_color=OmniTheme.BG_INPUT,
             font=ctk.CTkFont(family="Consolas", size=10),
-            corner_radius=8
+            corner_radius=OmniTheme.RADIUS_CONTROL
         )
         self.diag_box.pack(fill="both", expand=True, padx=16, pady=(0, 10))
 
         self.diag_btn = ctk.CTkButton(
             card2,
-            text="🔍  RUN FULL HARDWARE INSPECTION",
-            height=40,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            text="Run Diagnostics",
+            height=32,
+            font=ctk.CTkFont(size=11),
             fg_color=OmniTheme.BG_INPUT,
             hover_color=OmniTheme.BG_CARD_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_run_diagnostics
         )
-        self.diag_btn.pack(fill="x", padx=16, pady=(0, 16))
+        self.diag_btn.pack(anchor="w", padx=16, pady=(0, 16))
 
     # -------------------------------------------------------------------------
-    # TAB 5: Recordings Gallery
+    # Tab 5: Recordings Gallery
     # -------------------------------------------------------------------------
 
     def _build_gallery_tab(self):
         tab = self.tab_gallery
 
         top_row = ctk.CTkFrame(tab, fg_color="transparent")
-        top_row.pack(fill="x", padx=10, pady=(10, 6))
+        top_row.pack(fill="x", padx=10, pady=(10, 8))
 
-        gal_lbl = ctk.CTkLabel(top_row, text="📁  Recent Video Recordings", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        gal_lbl = ctk.CTkLabel(top_row, text="Recordings", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
         gal_lbl.pack(side="left")
 
         open_folder_btn = ctk.CTkButton(
             top_row,
-            text="📂  Open Folder in Explorer",
-            width=180,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            text="Open folder",
+            width=110,
+            height=28,
+            font=ctk.CTkFont(size=11),
             fg_color=OmniTheme.BG_CARD,
             hover_color=OmniTheme.BG_CARD_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self.controller.open_recordings_folder
         )
         open_folder_btn.pack(side="right", padx=6)
 
         refresh_gal_btn = ctk.CTkButton(
             top_row,
-            text="🔄  Refresh Gallery",
-            width=130,
-            font=ctk.CTkFont(size=12, weight="bold"),
+            text="Refresh",
+            width=80,
+            height=28,
+            font=ctk.CTkFont(size=11),
             fg_color=OmniTheme.BG_CARD,
             hover_color=OmniTheme.BG_CARD_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._refresh_gallery_list
         )
         refresh_gal_btn.pack(side="right", padx=6)
 
-        # Scrollable gallery container
         self.gallery_scroll = ctk.CTkScrollableFrame(
             tab,
             fg_color=OmniTheme.BG_CARD,
-            corner_radius=12,
-            border_width=1,
-            border_color=OmniTheme.BG_CARD_BORDER
+            corner_radius=OmniTheme.RADIUS_CARD,
+            border_width=0
         )
         self.gallery_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
     def _refresh_gallery_list(self):
-        """Re-populate the gallery scrollable container with existing video files."""
-        # Clear existing children
         for widget in self.gallery_scroll.winfo_children():
             widget.destroy()
 
@@ -758,149 +685,133 @@ class OmniCaptureApp(ctk.CTk):
         if not items:
             empty_lbl = ctk.CTkLabel(
                 self.gallery_scroll,
-                text="No recordings found in recordings/ yet.\nStart a recording from the Dual Recording, Mirror, or Camera tabs!",
-                font=ctk.CTkFont(size=13),
+                text="No recordings found in recordings/",
+                font=ctk.CTkFont(size=12),
                 text_color=OmniTheme.TEXT_MUTED
             )
             empty_lbl.pack(pady=40)
             return
 
         for item in items:
-            row = ctk.CTkFrame(self.gallery_scroll, fg_color=OmniTheme.BG_INPUT, corner_radius=8)
-            row.pack(fill="x", padx=8, pady=4)
+            row = ctk.CTkFrame(self.gallery_scroll, fg_color=OmniTheme.BG_INPUT, corner_radius=OmniTheme.RADIUS_CONTROL)
+            row.pack(fill="x", padx=6, pady=3)
 
-            # Icon tag
-            tag_color = OmniTheme.ACCENT_CYAN if item["tag"] == "PC Screen" else (OmniTheme.ACCENT_PURPLE if item["tag"] == "Mobile Camera" else OmniTheme.ACCENT_AMBER)
-            tag_lbl = ctk.CTkLabel(
-                row,
-                text=item["tag"],
-                font=ctk.CTkFont(size=10, weight="bold"),
-                text_color=tag_color,
-                fg_color=OmniTheme.BG_CARD,
-                corner_radius=6,
-                padx=8,
-                pady=2
-            )
-            tag_lbl.pack(side="left", padx=10, pady=8)
-
-            # File name & date
             info_frame = ctk.CTkFrame(row, fg_color="transparent")
-            info_frame.pack(side="left", fill="x", expand=True, padx=6)
+            info_frame.pack(side="left", fill="x", expand=True, padx=12, pady=8)
 
-            fn_lbl = ctk.CTkLabel(info_frame, text=item["name"], font=ctk.CTkFont(family="Consolas", size=12, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+            fn_lbl = ctk.CTkLabel(info_frame, text=item["name"], font=ctk.CTkFont(family="Consolas", size=12), text_color=OmniTheme.TEXT_MAIN)
             fn_lbl.pack(anchor="w")
 
-            meta_lbl = ctk.CTkLabel(info_frame, text=f"{item['mtime_str']}  |  Size: {item['size_str']}", font=ctk.CTkFont(size=10), text_color=OmniTheme.TEXT_MUTED)
+            meta_lbl = ctk.CTkLabel(info_frame, text=f"{item['tag']}  ·  {item['mtime_str']}  ·  {item['size_str']}", font=ctk.CTkFont(size=10), text_color=OmniTheme.TEXT_MUTED)
             meta_lbl.pack(anchor="w")
 
-            # Actions
             play_btn = ctk.CTkButton(
                 row,
-                text="▶  Play",
-                width=70,
-                height=28,
-                font=ctk.CTkFont(size=11, weight="bold"),
-                fg_color=OmniTheme.ACCENT_GREEN,
-                hover_color=OmniTheme.ACCENT_GREEN_HOVER,
-                text_color="#000000",
+                text="Play",
+                width=60,
+                height=26,
+                font=ctk.CTkFont(size=11),
+                fg_color=OmniTheme.BG_CARD,
+                hover_color=OmniTheme.BG_CARD_HOVER,
+                corner_radius=OmniTheme.RADIUS_CONTROL,
                 command=lambda p=item["path"]: self.controller.open_recording_file(p)
             )
             play_btn.pack(side="right", padx=6)
 
             up_btn = ctk.CTkButton(
                 row,
-                text="☁  Upload",
-                width=75,
-                height=28,
-                font=ctk.CTkFont(size=11, weight="bold"),
+                text="Upload",
+                width=65,
+                height=26,
+                font=ctk.CTkFont(size=11),
                 fg_color=OmniTheme.BG_CARD,
                 hover_color=OmniTheme.BG_CARD_HOVER,
+                corner_radius=OmniTheme.RADIUS_CONTROL,
                 command=lambda p=item["path"]: self._upload_recording(p)
             )
             up_btn.pack(side="right", padx=4)
 
     def _upload_recording(self, file_path: Path):
-        self._set_status(f"Uploading {file_path.name} to Google Drive...")
+        self._set_status(f"Uploading {file_path.name}")
         def _worker():
             ok, msg = self.controller.uploader.upload_file(str(file_path))
-            self.after(0, lambda: self._set_status(f"Google Drive: {msg}"))
+            self.after(0, lambda: self._set_status(msg))
         threading.Thread(target=_worker, daemon=True).start()
 
     # -------------------------------------------------------------------------
-    # TAB 6: Settings & Cloud
+    # Tab 6: Settings
     # -------------------------------------------------------------------------
 
     def _build_settings_tab(self):
         tab = self.tab_settings
 
-        card = ctk.CTkFrame(tab, fg_color=OmniTheme.BG_CARD, corner_radius=12, border_width=1, border_color=OmniTheme.BG_CARD_BORDER)
+        card = ctk.CTkFrame(tab, fg_color=OmniTheme.BG_CARD, corner_radius=OmniTheme.RADIUS_CARD, border_width=0)
         card.pack(fill="both", expand=True, padx=10, pady=10)
 
-        c_head = ctk.CTkLabel(card, text="⚙️  Application & Cloud Settings", font=ctk.CTkFont(size=16, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
-        c_head.pack(anchor="w", padx=16, pady=(16, 12))
+        c_head = ctk.CTkLabel(card, text="Settings", font=ctk.CTkFont(size=15, weight="bold"), text_color=OmniTheme.TEXT_MAIN)
+        c_head.pack(anchor="w", padx=18, pady=(16, 12))
 
-        # System preferences
-        sys_box = ctk.CTkFrame(card, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        sys_box.pack(fill="x", padx=16, pady=6)
+        sys_box = ctk.CTkFrame(card, fg_color="transparent")
+        sys_box.pack(fill="x", padx=18, pady=4)
 
-        ctk.CTkLabel(sys_box, text="System Preferences:", font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
-        ctk.CTkSwitch(sys_box, text="Minimize to Windows System Tray on close (Keep running in background)", variable=self.minimize_to_tray_var, progress_color=OmniTheme.ACCENT_CYAN).pack(anchor="w", padx=12, pady=6)
-        ctk.CTkSwitch(sys_box, text="Enable Global Windows Hotkeys (Ctrl+Alt+D, Ctrl+Alt+M, Ctrl+Alt+C, Ctrl+Alt+R)", variable=self.enable_hotkeys_var, progress_color=OmniTheme.ACCENT_CYAN, command=self._toggle_hotkeys).pack(anchor="w", padx=12, pady=(6, 12))
+        ctk.CTkLabel(sys_box, text="System", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_MAIN).pack(anchor="w", pady=(4, 6))
+        ctk.CTkSwitch(sys_box, text="Minimize to system tray on close", variable=self.minimize_to_tray_var, progress_color=OmniTheme.ACCENT_PRIMARY).pack(anchor="w", pady=6)
+        ctk.CTkSwitch(sys_box, text="Enable global hotkeys (Ctrl+Alt+D, Ctrl+Alt+M, Ctrl+Alt+C, Ctrl+Alt+R)", variable=self.enable_hotkeys_var, progress_color=OmniTheme.ACCENT_PRIMARY, command=self._toggle_hotkeys).pack(anchor="w", pady=6)
 
-        # Google Drive settings
-        drive_box = ctk.CTkFrame(card, fg_color=OmniTheme.BG_INPUT, corner_radius=10)
-        drive_box.pack(fill="x", padx=16, pady=10)
+        drive_box = ctk.CTkFrame(card, fg_color="transparent")
+        drive_box.pack(fill="x", padx=18, pady=(16, 10))
 
-        ctk.CTkLabel(drive_box, text="Google Drive Cloud Sync:", font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w", padx=12, pady=(10, 4))
+        ctk.CTkLabel(drive_box, text="Google Drive", font=ctk.CTkFont(size=12, weight="bold"), text_color=OmniTheme.TEXT_MAIN).pack(anchor="w", pady=(4, 6))
         drive_cfg = self.config.get("google_drive", {})
 
-        p_lbl = ctk.CTkLabel(drive_box, text=f"Sync Method:  {drive_cfg.get('method', 'desktop').upper()}  |  Desktop Drive Path: {self.controller.uploader.desktop_sync_path or 'Not Detected'}", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
-        p_lbl.pack(anchor="w", padx=12, pady=4)
+        p_lbl = ctk.CTkLabel(drive_box, text=f"Sync method: {drive_cfg.get('method', 'desktop')}  ·  Path: {self.controller.uploader.desktop_sync_path or 'Not detected'}", font=ctk.CTkFont(size=11), text_color=OmniTheme.TEXT_MUTED)
+        p_lbl.pack(anchor="w", pady=4)
 
         btn_row = ctk.CTkFrame(drive_box, fg_color="transparent")
-        btn_row.pack(anchor="w", padx=12, pady=(6, 12))
+        btn_row.pack(anchor="w", pady=(8, 12))
 
         test_auth_btn = ctk.CTkButton(
             btn_row,
-            text="🔐 Authenticate Google Drive API",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            fg_color=OmniTheme.BG_CARD,
+            text="Authenticate API",
+            font=ctk.CTkFont(size=11),
+            fg_color=OmniTheme.BG_INPUT,
             hover_color=OmniTheme.BG_CARD_HOVER,
+            corner_radius=OmniTheme.RADIUS_CONTROL,
             command=self._on_test_drive_auth
         )
-        test_auth_btn.pack(side="left", padx=(0, 8))
+        test_auth_btn.pack(side="left")
 
     def _toggle_hotkeys(self):
         if self.enable_hotkeys_var.get():
             self.hotkeys.start()
-            self._set_status("Global Windows Hotkeys activated!")
+            self._set_status("Global hotkeys enabled")
         else:
             self.hotkeys.stop()
-            self._set_status("Global Windows Hotkeys paused.")
+            self._set_status("Global hotkeys disabled")
 
     def _on_test_drive_auth(self):
-        self._set_status("Testing Google Drive authentication...")
+        self._set_status("Authenticating Google Drive")
         def _worker():
             test_file = get_base_dir() / "auth_test.tmp"
             test_file.write_text("OmniCapture Auth Test")
             ok, msg = self.controller.uploader._upload_via_api(test_file)
             if test_file.exists():
                 test_file.unlink()
-            self.after(0, lambda: self._set_status(f"Drive Auth Result: {msg}"))
+            self.after(0, lambda: self._set_status(f"Google Drive: {msg}"))
         threading.Thread(target=_worker, daemon=True).start()
 
     # -------------------------------------------------------------------------
-    # Footer
+    # Layout: Footer
     # -------------------------------------------------------------------------
 
     def _build_footer(self):
-        """Bottom Footer Bar with Status Ticker and Hotkeys Legend."""
-        footer_frame = ctk.CTkFrame(self, fg_color=OmniTheme.BG_CARD, height=36, corner_radius=0)
+        """Minimal footer bar without period punctuation or clutter."""
+        footer_frame = ctk.CTkFrame(self, fg_color=OmniTheme.BG_CARD, height=32, corner_radius=0)
         footer_frame.pack(fill="x", side="bottom")
 
         self.status_ticker = ctk.CTkLabel(
             footer_frame,
-            text="Ready — All systems operational.",
+            text="Ready",
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color=OmniTheme.TEXT_MUTED
         )
@@ -908,17 +819,18 @@ class OmniCaptureApp(ctk.CTk):
 
         hotkey_hint = ctk.CTkLabel(
             footer_frame,
-            text="Shortcuts: Ctrl+Alt+D (Dual Record)  |  Ctrl+Alt+M (Mirror)  |  Ctrl+Alt+C (Camera)  |  Ctrl+Alt+R (Folder)",
+            text="Ctrl+Alt+D: Dual Record  ·  Ctrl+Alt+M: Mirror  ·  Ctrl+Alt+C: Camera  ·  Ctrl+Alt+R: Folder",
             font=ctk.CTkFont(family="Segoe UI", size=10),
             text_color=OmniTheme.TEXT_DIM
         )
         hotkey_hint.pack(side="right", padx=16)
 
     def _set_status(self, message: str):
-        self.status_ticker.configure(text=message)
+        clean_msg = message.rstrip(".")
+        self.status_ticker.configure(text=clean_msg)
 
     # -------------------------------------------------------------------------
-    # Device State Updates (from Poller Callback)
+    # Device State Updates
     # -------------------------------------------------------------------------
 
     def _initial_refresh(self):
@@ -927,64 +839,55 @@ class OmniCaptureApp(ctk.CTk):
         self._on_run_diagnostics()
 
     def _on_device_state_changed(self, state: Dict[str, Any]):
-        """Runs whenever the background poller detects state changes."""
         self.after(0, lambda: self._update_device_ui(state))
 
     def _update_device_ui(self, state: Dict[str, Any]):
         status = state.get("status")
         model = state.get("model", "No Device")
         dev_id = state.get("device_id", "")
-        conn_str = "Wi-Fi 📶" if state.get("is_wireless") else "USB 🔌"
+        conn_str = "Wi-Fi" if state.get("is_wireless") else "USB"
 
         if status == "CONNECTED":
-            self.device_pill.configure(
-                text=f"● Connected: {model} ({dev_id}) [{conn_str}]",
+            batt = state.get("battery", {})
+            lvl = batt.get("level", "")
+            batt_str = f" · {lvl}" if lvl and lvl != "N/A" else ""
+            self.device_status_lbl.configure(
+                text=f"● {model} ({conn_str}){batt_str}",
                 text_color=OmniTheme.STATUS_CONNECTED
             )
-            batt = state.get("battery", {})
-            lvl = batt.get("level", "N/A")
-            b_stat = batt.get("status", "")
-            self.battery_pill.configure(text=f"🔋 {lvl} ({b_stat})" if lvl != "N/A" else "🔋 Connected")
-
             ip = state.get("wifi_ip")
-            if ip:
-                self.wifi_ip_lbl.configure(text=f"Phone Wi-Fi IP:  {ip}:5555")
-            else:
-                self.wifi_ip_lbl.configure(text="Phone Wi-Fi IP:  Connected via USB")
+            self.wifi_ip_lbl.configure(text=f"IP: {ip}:5555" if ip else f"Connected via {conn_str}")
         elif status == "UNAUTHORIZED":
-            self.device_pill.configure(
-                text=f"⚠️ {model} [UNAUTHORIZED - UNLOCK PHONE & TAP ALLOW]",
-                text_color=OmniTheme.ACCENT_AMBER
+            self.device_status_lbl.configure(
+                text=f"Unauthorized: unlock phone and allow debugging",
+                text_color=OmniTheme.STATUS_WARNING
             )
-            self.battery_pill.configure(text="🔋 Unauthorized")
         elif status == "OFFLINE":
-            self.device_pill.configure(
-                text=f"⚠️ {model} [OFFLINE - RECONNECT USB]",
-                text_color=OmniTheme.STATUS_OFFLINE
+            self.device_status_lbl.configure(
+                text=f"Device offline: reconnect cable",
+                text_color=OmniTheme.STATUS_WARNING
             )
-            self.battery_pill.configure(text="🔋 Offline")
         else:
-            self.device_pill.configure(
-                text="○ No Device Connected (Plug in phone & enable USB Debugging)",
+            self.device_status_lbl.configure(
+                text="No device connected",
                 text_color=OmniTheme.STATUS_DISCONNECTED
             )
-            self.battery_pill.configure(text="🔋 --%")
-            self.wifi_ip_lbl.configure(text="Phone Wi-Fi IP:  Device not connected")
+            self.wifi_ip_lbl.configure(text="Device not connected")
 
     def _on_manual_refresh(self):
-        self._set_status("Refreshing devices...")
+        self._set_status("Scanning devices")
         self.controller.refresh_device_now()
         self._refresh_gallery_list()
-        self._set_status("Device scan complete.")
+        self._set_status("Ready")
 
     def _on_release_lock(self):
-        self._set_status("Releasing camera sensor lock...")
+        self._set_status("Releasing camera sensor lock")
         ok, msg = self.controller.release_camera_lock()
         self._set_status(msg)
         self.tray.notify("Camera Lock", msg)
 
     # -------------------------------------------------------------------------
-    # Actions: Dual Simultaneous Recording
+    # Actions: Dual Recording
     # -------------------------------------------------------------------------
 
     def _on_start_dual_recording(self):
@@ -995,8 +898,8 @@ class OmniCaptureApp(ctk.CTk):
         preview = self.dual_preview_var.get()
         upload = self.dual_upload_var.get()
 
-        self._set_status("Initializing Dual Simultaneous Recording...")
-        self.dual_log_box.insert("end", f"\n[INIT] Starting Dual Recording (PC: {pc_fps} FPS, Mobile: {cam_fps} FPS, Facing: {facing})...\n")
+        self._set_status("Initializing dual recording")
+        self.dual_log_box.insert("end", f"Starting dual recording ({facing} camera, {pc_fps} fps PC, {cam_fps} fps camera)\n")
         self.dual_log_box.see("end")
 
         ok, msg = self.controller.start_dual_recording(
@@ -1012,27 +915,27 @@ class OmniCaptureApp(ctk.CTk):
 
         if ok:
             self.dual_start_btn.pack_forget()
-            self.dual_live_card.pack(fill="x", padx=18, pady=(4, 16))
-            self._set_status("🔴 DUAL SIMULTANEOUS RECORDING ACTIVE!")
-            self.tray.notify("OmniCapture", "Dual Simultaneous Recording ACTIVE!")
+            self.dual_live_card.pack(fill="x", padx=20, pady=(8, 18))
+            self._set_status("Recording in progress")
+            self.tray.notify("OmniCapture", "Dual recording in progress")
         else:
-            self._set_status(f"Dual Recording Error: {msg}")
-            self.dual_log_box.insert("end", f"[ERROR] {msg}\n")
+            self._set_status(f"Recording error: {msg}")
+            self.dual_log_box.insert("end", f"Error: {msg}\n")
             self.dual_log_box.see("end")
 
     def _on_dual_tick(self, elapsed: float, pc_sz: int, cam_sz: int):
         m, s = divmod(int(elapsed), 60)
         h, m = divmod(m, 60)
-        time_str = f"⏱  {h:02d}:{m:02d}:{s:02d}"
+        time_str = f"{h:02d}:{m:02d}:{s:02d}"
 
         def _fmt(b: int) -> str:
             for u in ["B", "KB", "MB", "GB"]:
                 if b < 1024.0:
-                    return f"{b:.2f} {u}"
+                    return f"{b:.1f} {u}"
                 b /= 1024.0
-            return f"{b:.2f} TB"
+            return f"{b:.1f} TB"
 
-        stats_str = f"Stream 1 [PC Screen]: {_fmt(pc_sz)}  |  Stream 2 [Mobile Cam]: {_fmt(cam_sz)}"
+        stats_str = f"PC screen: {_fmt(pc_sz)}  ·  Camera: {_fmt(cam_sz)}"
         self.after(0, lambda: self._update_dual_live_labels(time_str, stats_str))
 
     def _update_dual_live_labels(self, time_str: str, stats_str: str):
@@ -1040,37 +943,30 @@ class OmniCaptureApp(ctk.CTk):
         self.dual_stream_stats_lbl.configure(text=stats_str)
 
     def _on_stop_dual_recording(self):
-        self._set_status("Stopping and finalizing both video files...")
+        self._set_status("Finalizing files")
         self.controller.stop_dual_recording()
 
     def _on_dual_complete(self, result: Dict[str, Any]):
-        """Invoked when dual recording finishes."""
         def _ui_update():
             self.dual_live_card.pack_forget()
-            self.dual_start_btn.pack(fill="x")
+            self.dual_start_btn.pack(anchor="w", ipadx=16)
 
             status = result.get("status", "UNKNOWN")
             dur_fmt = result.get("duration_formatted", "00:00")
             pc_file = result.get("pc_screen_file")
             cam_file = result.get("mobile_camera_file")
 
-            log_msg = f"\n{'='*55}\nDUAL RECORDING COMPLETED: [{status}]\nDuration: {dur_fmt}\n"
+            log_msg = f"\nDual recording completed ({status}, {dur_fmt})\n"
             if pc_file:
-                log_msg += f"  [✓] PC Screen:       {pc_file.name} ({result.get('pc_screen_size_formatted')})\n"
-            else:
-                log_msg += "  [✗] PC Screen:       FAILED or 0 bytes\n"
-
+                log_msg += f"  PC screen: {pc_file.name} ({result.get('pc_screen_size_formatted')})\n"
             if cam_file:
-                log_msg += f"  [✓] Mobile Camera:   {cam_file.name} ({result.get('mobile_camera_size_formatted')})\n"
-            else:
-                log_msg += "  [✗] Mobile Camera:   FAILED or 0 bytes\n"
-            log_msg += f"{'='*55}\n"
+                log_msg += f"  Camera:    {cam_file.name} ({result.get('mobile_camera_size_formatted')})\n"
 
             self.dual_log_box.insert("end", log_msg)
             self.dual_log_box.see("end")
 
-            self._set_status(f"Dual Recording Finished: {status}")
-            self.tray.notify("OmniCapture", f"Dual Recording Finished: {status} ({dur_fmt})")
+            self._set_status(f"Recording finished ({status})")
+            self.tray.notify("OmniCapture", f"Recording finished ({status})")
             self._refresh_gallery_list()
 
         self.after(0, _ui_update)
@@ -1083,34 +979,34 @@ class OmniCaptureApp(ctk.CTk):
         uhid = "UHID" in self.mirror_mode_seg.get()
         screen_off = self.mirror_screen_off_var.get()
         stay_awake = self.mirror_awake_var.get()
-        self._set_status("Launching Display Mirror & Touch Controller...")
+        self._set_status("Launching display mirror")
         ok, msg = self.controller.launch_display_mirror(
             uhid=uhid,
             screen_off=screen_off,
             stay_awake=stay_awake,
-            on_exit=lambda code: self.after(0, lambda: self._set_status("Display Mirror session ended."))
+            on_exit=lambda code: self.after(0, lambda: self._set_status("Mirror session ended"))
         )
         self._set_status(msg)
 
     def _on_start_screen_recording(self):
-        fmt = "mkv" if "MKV" in self.screen_rec_fmt_seg.get() else "mp4"
+        fmt = self.screen_rec_fmt_seg.get().lower()
         upload = self.screen_rec_upload_var.get()
-        self._set_status("Starting Mobile Screen Recording...")
+        self._set_status("Starting screen recording")
         ok, msg = self.controller.record_screen(
             record_format=fmt,
             auto_upload=upload,
-            on_complete=lambda path, dur, sz: self.after(0, lambda: self._on_single_rec_complete(path, dur, sz, "Mobile Screen"))
+            on_complete=lambda path, dur, sz: self.after(0, lambda: self._on_single_rec_complete(path, dur, sz, "Screen"))
         )
         self._set_status(msg)
 
     def _on_launch_camera_stream(self):
         facing = "back" if "Back" in self.cam_stream_facing_seg.get() else "front"
         mic = self.cam_stream_mic_var.get()
-        self._set_status(f"Launching Stealth {facing.capitalize()} Camera stream...")
+        self._set_status("Launching camera feed")
         ok, msg = self.controller.launch_stealth_camera(
             facing=facing,
             audio_mic=mic,
-            on_exit=lambda code: self.after(0, lambda: self._set_status("Camera stream session ended."))
+            on_exit=lambda code: self.after(0, lambda: self._set_status("Camera session ended"))
         )
         self._set_status(msg)
 
@@ -1120,14 +1016,14 @@ class OmniCaptureApp(ctk.CTk):
         preview = self.cam_rec_preview_var.get()
         upload = self.cam_rec_upload_var.get()
 
-        self._set_status(f"Starting Mobile Camera Recording ({facing.capitalize()})...")
+        self._set_status("Starting camera recording")
         ok, msg = self.controller.record_camera(
             facing=facing,
             record_format=fmt,
             preview=preview,
             audio_mic=True,
             auto_upload=upload,
-            on_complete=lambda path, dur, sz: self.after(0, lambda: self._on_single_rec_complete(path, dur, sz, "Mobile Camera"))
+            on_complete=lambda path, dur, sz: self.after(0, lambda: self._on_single_rec_complete(path, dur, sz, "Camera"))
         )
         self._set_status(msg)
 
@@ -1135,29 +1031,28 @@ class OmniCaptureApp(ctk.CTk):
         if path and sz > 0:
             sz_str = self.controller.recorder.format_size(sz)
             dur_str = self.controller.recorder.format_duration(dur)
-            self._set_status(f"{mode_name} Recording Saved: {path.name} ({sz_str}, {dur_str})")
-            self.tray.notify("OmniCapture", f"{mode_name} Saved: {path.name} ({sz_str})")
+            self._set_status(f"Saved: {path.name} ({sz_str})")
+            self.tray.notify("OmniCapture", f"Saved: {path.name} ({sz_str})")
             self._refresh_gallery_list()
         else:
-            self._set_status(f"{mode_name} Recording failed or produced 0 bytes.")
+            self._set_status(f"{mode_name} recording failed or produced 0 bytes")
 
     def _on_switch_to_wireless(self):
-        self._set_status("Configuring Wireless ADB on port 5555...")
+        self._set_status("Configuring wireless ADB")
         def _worker():
             ok, msg = self.controller.switch_to_wireless_adb()
-            self.after(0, lambda: self._set_status(f"Wireless ADB: {msg}"))
+            self.after(0, lambda: self._set_status(msg))
             self.after(0, lambda: self.tray.notify("Wireless ADB", msg))
         threading.Thread(target=_worker, daemon=True).start()
 
     def _on_run_diagnostics(self):
         diag = self.controller.query_diagnostics()
         out = (
-            f"=== RUNTIME & BINARIES ===\n"
-            f"ADB Binary:    {diag['adb_path']} ({diag['adb_version']})\n"
-            f"Scrcpy Engine: {diag['scrcpy_path']}\n"
-            f"FFmpeg Engine: {diag['ffmpeg_path']} ({diag['ffmpeg_version']})\n\n"
-            f"=== CAMERA2 SENSORS ===\n{diag['cameras_info']}\n\n"
-            f"=== RESOLUTIONS ===\n{diag['camera_sizes']}\n"
+            f"ADB:    {diag['adb_path']} ({diag['adb_version']})\n"
+            f"Scrcpy: {diag['scrcpy_path']}\n"
+            f"FFmpeg: {diag['ffmpeg_path']} ({diag['ffmpeg_version']})\n\n"
+            f"Sensors:\n{diag['cameras_info']}\n\n"
+            f"Resolutions:\n{diag['camera_sizes']}\n"
         )
         self.diag_box.delete("1.0", "end")
         self.diag_box.insert("1.0", out)
@@ -1167,10 +1062,6 @@ class OmniCaptureApp(ctk.CTk):
     # -------------------------------------------------------------------------
 
     def _setup_hotkeys(self):
-        # 1: Ctrl+Alt+D (Dual Recording)
-        # 2: Ctrl+Alt+M (Mirror)
-        # 3: Ctrl+Alt+C (Camera)
-        # 4: Ctrl+Alt+R (Folder)
         self.hotkeys.register(1, 0x0002 | 0x0001, ord("D"), self._on_hotkey_dual_record)
         self.hotkeys.register(2, 0x0002 | 0x0001, ord("M"), self._on_hotkey_mirror)
         self.hotkeys.register(3, 0x0002 | 0x0001, ord("C"), self._on_hotkey_camera)
@@ -1181,17 +1072,17 @@ class OmniCaptureApp(ctk.CTk):
             self._on_stop_dual_recording()
         else:
             self._show_window()
-            self.tabs.set("🎬 Dual Recording (Hero)")
+            self.tabs.set("Dual Recording")
             self._on_start_dual_recording()
 
     def _on_hotkey_mirror(self):
         self._show_window()
-        self.tabs.set("📱 Display Mirror & Control")
+        self.tabs.set("Screen Mirror")
         self._on_launch_mirror()
 
     def _on_hotkey_camera(self):
         self._show_window()
-        self.tabs.set("📷 Stealth Camera")
+        self.tabs.set("Camera")
         self._on_launch_camera_stream()
 
     # -------------------------------------------------------------------------
@@ -1199,24 +1090,21 @@ class OmniCaptureApp(ctk.CTk):
     # -------------------------------------------------------------------------
 
     def _show_window(self):
-        """Restore window from minimized / tray state."""
         self.deiconify()
         self.lift()
         self.focus_force()
 
     def _on_window_close(self):
-        """Handle WM_DELETE_WINDOW."""
         if self.minimize_to_tray_var.get():
             self.withdraw()
             self.tray.notify(
-                "OmniCapture Minimized",
-                "OmniCapture is running in the system tray. Use shortcuts (Ctrl+Alt+D) or click the tray icon to restore."
+                "OmniCapture",
+                "OmniCapture is running in the background. Press Ctrl+Alt+D to record or click the tray icon."
             )
         else:
             self._on_app_exit()
 
     def _on_app_exit(self):
-        """Clean shutdown of all background components."""
         if self.controller.is_dual_recording():
             self.controller.stop_dual_recording()
         self.controller.stop_device_poller()

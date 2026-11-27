@@ -63,16 +63,8 @@ def save_config(cfg: dict):
         json.dump(cfg, f, indent=2)
 
 def print_banner():
-    banner = r"""
-  ___                  _  ____             _
- / _ \ _ __ ___  _ __ (_)/ ___|__ _ _ __ | |_ _   _ _ __ ___
-| | | | '_ ` _ \| '_ \| | |   / _` | '_ \| __| | | | '__/ _ \
-| |_| | | | | | | | | | | |__| (_| | |_) | |_| |_| | | |  __/
- \___/|_| |_| |_|_| |_|_|\____\__,_| .__/ \__|\__,_|_|  \___|
-                                   |_|  v1.1.0-production
-    High-Performance Android & PC Desktop Capture Suite
-"""
-    print(banner)
+    print("OmniCapture 1.2.0")
+    print("Android & PC Desktop Capture Suite\n")
 
 def get_system_status(adb: ADBManager, scrcpy: ScrcpyEngine) -> dict:
     devices = adb.list_devices()
@@ -149,56 +141,40 @@ def check_device_ready_interactive(adb: ADBManager, dev_id: Optional[str]) -> Op
     return check["device_id"]
 
 def print_status_bar(status: dict):
-    print("┌" + "─" * 78 + "┐")
     if not status["scrcpy_ready"]:
-        print("│  \033[91m[!] SCRCPY NOT FOUND: Check path in config.json\033[0m" + " " * 31 + "│")
+        print("Status: scrcpy not found in bin/ or system PATH\n")
     elif not status["devices"]:
-        print("│  \033[93m[!] NO PHONE DETECTED: Plug in USB cable & enable 'USB Debugging'\033[0m" + " " * 12 + "│")
+        print("Device: No device detected (connect via USB with USB Debugging enabled)\n")
     else:
         dev = status["active_device"]
         model = dev.get("model", "Android Device")
         dev_id = dev.get("id", "")
-        conn_type = "Wi-Fi 📶" if dev.get("is_wireless") else "USB 🔌"
+        conn_type = "Wi-Fi" if dev.get("is_wireless") else "USB"
         state = dev.get("state", "unknown")
 
         if state == "unauthorized":
-            line = f" ⚠️  \033[1;33m{model}\033[0m ({dev_id}) [\033[91mUNAUTHORIZED - UNLOCK PHONE & TAP ALLOW\033[0m]"
-            clean_len = len(f" {model} ({dev_id}) [UNAUTHORIZED - UNLOCK PHONE & TAP ALLOW]")
+            print(f"Device: {model} ({dev_id}) — unauthorized (unlock phone and allow debugging)\n")
         elif state == "offline":
-            line = f" ⚠️  \033[1;31m{model}\033[0m ({dev_id}) [\033[91mDEVICE OFFLINE - RECONNECT USB CABLE\033[0m]"
-            clean_len = len(f" {model} ({dev_id}) [DEVICE OFFLINE - RECONNECT USB CABLE]")
+            print(f"Device: {model} ({dev_id}) — offline (reconnect USB cable)\n")
         else:
             batt = status["battery"]
-            line = f" 📱  \033[1;32m{model}\033[0m ({dev_id}) [{conn_type}] | 🔋  \033[1;33m{batt['level']}\033[0m ({batt['status']})"
-            clean_len = len(f" {model} ({dev_id}) [{conn_type}] | {batt['level']} ({batt['status']})")
-
-        pad = max(0, 78 - clean_len - 4)
-        print("│" + line + " " * pad + "│")
-    print("└" + "─" * 78 + "┘")
+            b_str = f" · Battery {batt['level']}" if batt.get("level") and batt["level"] != "N/A" else ""
+            print(f"Device: ● {model} ({conn_type}){b_str}\n")
 
 def show_hotkeys_guide():
-    print("""
-\033[1;36m==============================================================================
-  ⌨️  ACTIVE HOTKEYS & KEYBOARD SHORTCUTS GUIDE
-==============================================================================\033[0m
-
-  All shortcuts use \033[1;33mLeft Alt\033[0m as the shortcut modifier while the window is focused:
-
-  \033[1m[Alt + Z]\033[0m           ⏸️  \033[93mPAUSE / Freeze\033[0m screen or camera feed
-  \033[1m[Alt + Shift + Z]\033[0m   ▶️  \033[92mRESUME\033[0m screen or camera feed
-  \033[1m[Alt + O]\033[0m           🌑  \033[97mTurn phone screen OFF\033[0m (keeps streaming & recording!)
-  \033[1m[Alt + Shift + O]\033[0m   💡  \033[97mTurn phone screen ON\033[0m
-  \033[1m[Alt + F]\033[0m           🖥️  Toggle \033[97mFullscreen\033[0m mode
-  \033[1m[Alt + H]\033[0m           🏠  Press phone \033[97mHOME\033[0m button
-  \033[1m[Alt + B]\033[0m           🔙  Press phone \033[97mBACK\033[0m button (or Right-Click)
-  \033[1m[Alt + S]\033[0m           📑  Open \033[97mApp Switcher / Recent Apps\033[0m
-  \033[1m[Alt + P]\033[0m           ⚡  Toggle \033[97mPower / Lock\033[0m button
-  \033[1m[Alt + Up / Down]\033[0m   🔊  Increase / Decrease \033[97mVolume\033[0m
-  \033[1m[Alt + R]\033[0m           🔄  Rotate device screen
-  \033[1m[Alt + Shift + R]\033[0m   🔁  Reset video capture / encoder
-  \033[1m[Enter] / [Ctrl+C]\033[0m  🛑  \033[91mSTOP Dual Recording\033[0m & finalize both files
-
-\033[1;36m==============================================================================\033[0m
+    print("""Shortcuts (Left Alt + key when window is focused):
+  Alt + Z          Pause stream
+  Alt + Shift + Z  Resume stream
+  Alt + O          Turn phone screen off
+  Alt + Shift + O  Turn phone screen on
+  Alt + F          Toggle fullscreen
+  Alt + H          Home button
+  Alt + B          Back button
+  Alt + S          Recent apps
+  Alt + P          Power button
+  Alt + Up / Down  Volume up / down
+  Alt + R          Rotate display
+  Ctrl + C         Stop recording
 """)
 
 def launch_gui_app(cfg: dict):
@@ -227,23 +203,22 @@ def interactive_menu(
 
         dev_id = status["active_device"]["id"] if status["active_device"] else None
 
-        print("""
-\033[1;37mMAIN MENU OPTIONS:\033[0m
-  \033[1;35m[G]\033[0m 🖥️   \033[1mLaunch Modern Windows 11 GUI Dashboard\033[0m (Dark mode, system tray & live metrics)
-  \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & PC Touch Controller\033[0m (Interactive control, mouse & keyboard)
-  \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m           (\033[92mNO camera app opened\033[0m, raw sensor stream)
-  \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m          (\033[92mNO camera app opened\033[0m, selfie stream)
-  \033[1;36m[4]\033[0m 🔴  \033[1mRecord Mobile Screen -> PC File\033[0m      (Direct stream with Pause/Resume hotkeys)
-  \033[1;36m[5]\033[0m 🎥  \033[1mRecord Mobile Camera -> PC File\033[0m      (Stealth camera + mic audio -> PC)
-  \033[1;36m[6]\033[0m 🔄  \033[1mDual Live Preview (Screen + Camera)\033[0m  (Display + Camera preview side-by-side)
-  \033[1;32m[7]\033[0m 🎬  \033[1mDual Simultaneous Recording\033[0m          (\033[93mPC Screen + Mobile Cam -> 2 Separate Files\033[0m)
-  \033[1;33m[8]\033[0m ⌨️   \033[1mView Keyboard Hotkeys Guide\033[0m          (Pause, Resume, Screen Off, Stop shortcuts)
-  \033[1;36m[9]\033[0m 📶 \033[1mSwitch to Wireless ADB (Wi-Fi)\033[0m       (Unplug USB and capture over Wi-Fi)
-  \033[1;36m[10]\033[0m ☁️  \033[1mGoogle Drive Cloud Settings\033[0m          (Desktop virtual sync / REST API v3)
-  \033[1;36m[11]\033[0m 🔍 \033[1mDiagnostics & Hardware Inspection\033[0m    (Camera IDs, resolutions, battery, ADB check)
-  \033[1;31m[0]\033[0m 🚪  \033[1mExit\033[0m
+        print("""Actions:
+  [g] Launch Desktop GUI Dashboard
+  [1] Display Mirror & PC Controller
+  [2] Back Camera Stream
+  [3] Front Camera Stream
+  [4] Record Mobile Screen
+  [5] Record Mobile Camera
+  [6] Dual Live Preview
+  [7] Dual Simultaneous Recording
+  [8] Keyboard Shortcuts
+  [9] Switch to Wi-Fi ADB
+  [10] Google Drive Cloud Settings
+  [11] Diagnostics
+  [0] Exit
 """)
-        choice = input("\033[1;33mSelect an option [0-11, G]: \033[0m").strip().lower()
+        choice = input("Select an option [0-11, g]: ").strip().lower()
 
         if choice in ("g", "gui"):
             launch_gui_app(cfg)
