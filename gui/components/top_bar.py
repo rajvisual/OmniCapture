@@ -78,7 +78,7 @@ class UnifiedTopBar(ctk.CTkFrame):
         # Version Pill
         self.ver_lbl = ctk.CTkLabel(
             self.left_box,
-            text="v1.3.0",
+            text="v1.4.0-dev",
             font=OmniTheme.font_caption(),
             text_color=tokens.text_dim
         )
@@ -266,6 +266,8 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"label": "Refresh Devices", "accelerator": "F5", "command": h.get("refresh_devices")},
             {"separator": True},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
+            {"separator": True},
+            {"label": "Developer: Component Gallery...", "command": h.get("open_gallery")},
         ]
 
     def _get_view_menu_items(self) -> list:
@@ -285,6 +287,8 @@ class UnifiedTopBar(ctk.CTkFrame):
         return [
             {"label": "Studio Preferences...", "accelerator": "Ctrl+,", "command": h.get("open_settings")},
             {"label": "Hardware Diagnostics...", "command": h.get("open_diagnostics")},
+            {"separator": True},
+            {"label": "Developer: Component Gallery...", "command": h.get("open_gallery")},
             {"separator": True},
             {"label": "Keyboard Shortcuts Guide", "command": h.get("open_hotkeys_guide")},
         ]

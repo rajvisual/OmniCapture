@@ -32,7 +32,8 @@ class TestPCRecorder(unittest.TestCase):
         self.assertIn("-i", cmd)
         self.assertIn("desktop", cmd)
         self.assertIn("-c:v", cmd)
-        self.assertIn("libx264", cmd)
+        self.assertIn(self.recorder.encoder, cmd)
+        self.assertIn(self.recorder.encoder, ["h264_nvenc", "h264_amf", "h264_qsv", "h264_mf", "libx264"])
         self.assertIn(str(out_path), cmd)
 
     def test_dual_filenames_generation(self):

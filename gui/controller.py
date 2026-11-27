@@ -184,8 +184,9 @@ class GUIController:
         return ok, msg
 
     def query_diagnostics(self) -> Dict[str, Any]:
-        """Fetch complete system, binary, and camera diagnostics."""
+        """Fetch complete system, binary, encoder, and camera diagnostics."""
         target = self.get_target_device_id()
+        codec, encoder_display = self.pc_recorder.detect_best_encoder()
         diag = {
             "adb_path": str(self.adb.adb_path),
             "adb_version": self.adb.get_adb_version() or "Not detected",
@@ -194,6 +195,8 @@ class GUIController:
             "ffmpeg_path": str(self.pc_recorder.ffmpeg_path) if self.pc_recorder.ffmpeg_path else "Not found",
             "ffmpeg_version": self.pc_recorder.get_ffmpeg_version() or "Not detected",
             "ffmpeg_available": self.pc_recorder.is_available(),
+            "video_encoder": codec,
+            "video_encoder_display": encoder_display,
             "device_id": target,
             "device_status": self._device_cache.get("status"),
             "cameras_info": "Device not connected",
@@ -206,6 +209,22 @@ class GUIController:
             except Exception as e:
                 diag["cameras_info"] = f"Error querying cameras: {e}"
         return diag
+
+    def get_active_encoder_name(self) -> str:
+        """Friendly name of the detected active hardware video encoder."""
+        return self.pc_recorder.detect_best_encoder()[1]
+
+    def get_active_encoder_short(self) -> str:
+        """Concise acronym for the active encoder for status bar readout."""
+        codec, _ = self.pc_recorder.detect_best_encoder()
+        short_names = {
+            "h264_nvenc": "NVENC",
+            "h264_amf": "AMD AMF",
+            "h264_qsv": "Intel QSV",
+            "h264_mf": "MediaFoundation",
+            "libx264": "x264 CPU"
+        }
+        return short_names.get(codec, codec.upper())
 
     # -------------------------------------------------------------------------
     # Single Stream Launchers (Mirror, Camera, Direct Record)

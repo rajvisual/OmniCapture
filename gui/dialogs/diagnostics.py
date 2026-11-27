@@ -132,7 +132,7 @@ class DiagnosticsDialog(ctk.CTkToplevel):
             ]
         )
 
-        # Section 2: Core Subsystem Binaries
+        # Section 2: Core Subsystem Binaries & Video Encoders
         self._add_card(
             "Core Execution Subsystems",
             [
@@ -142,6 +142,8 @@ class DiagnosticsDialog(ctk.CTkToplevel):
                 ("Scrcpy Ready", "Installed & Verified" if diag.get("scrcpy_ready") else "Missing"),
                 ("FFmpeg Path", diag.get("ffmpeg_path", "Not found")),
                 ("FFmpeg Version", diag.get("ffmpeg_version", "Not found")),
+                ("Video Encoder", diag.get("video_encoder_display", "Software CPU (libx264)")),
+                ("Encoder Codec", diag.get("video_encoder", "libx264")),
                 ("FFmpeg Available", "Yes (Hardware accelerated)" if diag.get("ffmpeg_available") else "No"),
             ]
         )

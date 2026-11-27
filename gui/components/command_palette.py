@@ -148,9 +148,10 @@ class CommandPalette(ctk.CTkToplevel):
         for idx, cmd in enumerate(self.filtered_commands[:15]): # Cap at 15 for responsiveness
             is_selected = (idx == self.selected_index)
             bg = OmniTheme.BG_CARD_HOVER if is_selected else "transparent"
-            border_col = OmniTheme.BORDER_FOCUS if is_selected else "transparent"
+            bw = 1 if is_selected else 0
+            border_col = OmniTheme.BORDER_FOCUS
 
-            row = ctk.CTkFrame(self.scroll_list, fg_color=bg, border_width=1, border_color=border_col, corner_radius=OmniTheme.RADIUS_CONTROL)
+            row = ctk.CTkFrame(self.scroll_list, fg_color=bg, border_width=bw, border_color=border_col, corner_radius=OmniTheme.RADIUS_CONTROL)
             row.pack(fill="x", pady=1)
 
             # Left content: Category + Title

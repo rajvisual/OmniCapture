@@ -147,6 +147,17 @@ class StudioSettingsDialog(ctk.CTkToplevel):
         self.theme_seg.set("Dark Liquid Glass" if curr_theme == "dark" else "Light Minimal")
         self.theme_seg.pack(fill="x", pady=(4, 10))
 
+        ctk.CTkLabel(c3, text="Glass effects", font=OmniTheme.font_body(), text_color=OmniTheme.TEXT_MAIN).pack(anchor="w")
+        self.glass_seg = ctk.CTkSegmentedButton(
+            c3,
+            values=["Auto", "On", "Off"],
+            selected_color=OmniTheme.ACCENT_PRIMARY,
+            corner_radius=OmniTheme.RADIUS_CONTROL
+        )
+        curr_glass = self.config.get("glass_effects", "auto").capitalize()
+        self.glass_seg.set(curr_glass if curr_glass in ("Auto", "On", "Off") else "Auto")
+        self.glass_seg.pack(fill="x", pady=(4, 10))
+
         ctk.CTkSwitch(
             c3,
             text="Minimize to Windows System Tray on close",
@@ -236,10 +247,18 @@ class StudioSettingsDialog(ctk.CTkToplevel):
         self.config["default_record_format"] = fmt_val
         self.config["max_fps"] = 60 if "60" in self.fps_seg.get() else 30
 
-        # Update Theme
+        # Update Theme & Glass Effects
         theme_choice = "dark" if "Dark" in self.theme_seg.get() else "light"
         self.config["theme"] = theme_choice
         OmniTheme.set_theme(theme_choice)
+
+        glass_choice = self.glass_seg.get().lower()
+        self.config["glass_effects"] = glass_choice
+        try:
+            from gui.components.frosted_glass import FrostedGlassManager
+            FrostedGlassManager.get_instance().set_preference_mode(glass_choice)
+        except Exception:
+            pass
 
         if self.on_save_callback:
             self.on_save_callback()
