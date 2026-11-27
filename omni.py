@@ -184,6 +184,8 @@ def launch_gui_app(cfg: dict):
         app = OmniCaptureApp(cfg)
         app.mainloop()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"\n\033[1;31m[!] Error launching GUI dashboard: {e}\033[0m")
         print("\033[90mEnsure customtkinter, pillow, and pystray are installed:\033[0m")
         print("  pip install -r requirements.txt\n")

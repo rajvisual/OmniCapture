@@ -168,5 +168,5 @@ class DesktopMenuBar:
         menubar.add_cascade(label="Help", menu=help_menu, underline=0)
 
         # Attach to root window
-        root.config(menu=menubar)
+        root.configure(menu=menubar)
         return menubar

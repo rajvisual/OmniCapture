@@ -42,7 +42,7 @@ class OmniCaptureApp(ctk.CTk):
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
 
-        self.config = config
+        self.app_config = config
         self.controller = GUIController(config)
 
         # Active Studio Scene: "dual" | "mirror" | "camera" | "screen"
@@ -111,10 +111,10 @@ class OmniCaptureApp(ctk.CTk):
 
     def _restore_window_geometry(self):
         """Restore previous window size and position, or use studio default."""
-        w = self.config.get("window_width", 1180)
-        h = self.config.get("window_height", 800)
-        x = self.config.get("window_x")
-        y = self.config.get("window_y")
+        w = self.app_config.get("window_width", 1180)
+        h = self.app_config.get("window_height", 800)
+        x = self.app_config.get("window_x")
+        y = self.app_config.get("window_y")
         if x is not None and y is not None:
             self.geometry(f"{w}x{h}+{x}+{y}")
         else:
@@ -123,10 +123,10 @@ class OmniCaptureApp(ctk.CTk):
     def _save_window_geometry(self):
         """Persist current window coordinates to config dictionary."""
         try:
-            self.config["window_width"] = self.winfo_width()
-            self.config["window_height"] = self.winfo_height()
-            self.config["window_x"] = self.winfo_x()
-            self.config["window_y"] = self.winfo_y()
+            self.app_config["window_width"] = self.winfo_width()
+            self.app_config["window_height"] = self.winfo_height()
+            self.app_config["window_x"] = self.winfo_x()
+            self.app_config["window_y"] = self.winfo_y()
         except Exception:
             pass
 
@@ -903,7 +903,7 @@ class OmniCaptureApp(ctk.CTk):
     def _open_settings_window(self):
         StudioSettingsDialog(
             self,
-            self.config,
+            self.app_config,
             self.controller,
             self.minimize_to_tray_var,
             self.enable_hotkeys_var,
