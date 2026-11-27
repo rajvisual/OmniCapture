@@ -13,7 +13,11 @@ Write-Host ""
 
 # 1. Check Python syntax compilation
 Write-Host "[1/4] Checking Python syntax compilation across all files..." -ForegroundColor Yellow
-$pyFiles = Get-ChildItem -Path $repoRoot -Filter "*.py" -Recurse | Where-Object { $_.FullName -notmatch "\\\.venv\\" }
+$pyFiles = Get-ChildItem -Path $repoRoot -Filter "*.py" -Recurse | Where-Object { 
+    $_.FullName -notmatch "\\\.venv\\" -and 
+    $_.FullName -notmatch "\\build\\" -and 
+    $_.FullName -notmatch "\\dist\\" 
+}
 foreach ($file in $pyFiles) {
     Write-Host "  Compiling $($file.Name)..." -NoNewline
     python -m py_compile $file.FullName

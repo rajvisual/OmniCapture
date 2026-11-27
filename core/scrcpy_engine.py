@@ -4,13 +4,18 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
+from core.resource_path import resolve_binary
+
 class ScrcpyEngine:
     def __init__(self, scrcpy_dir: str):
         self.scrcpy_dir = Path(scrcpy_dir)
         self.scrcpy_path = self._resolve_scrcpy_path()
 
     def _resolve_scrcpy_path(self) -> Path:
-        """Find scrcpy binary inside local project bin/ or configured path."""
+        """Find scrcpy binary inside bundled bin/, local project bin/ or configured path."""
+        resolved = resolve_binary("scrcpy", self.scrcpy_dir)
+        if resolved:
+            return resolved
         base_bin = Path(__file__).resolve().parent.parent / "bin" / "scrcpy.exe"
         candidates = [
             base_bin,

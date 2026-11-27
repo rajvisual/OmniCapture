@@ -5,13 +5,18 @@ import time
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
 
+from core.resource_path import resolve_binary
+
 class ADBManager:
     def __init__(self, scrcpy_dir: str):
         self.scrcpy_dir = Path(scrcpy_dir)
         self.adb_path = self._resolve_adb_path()
 
     def _resolve_adb_path(self) -> Path:
-        """Find adb.exe inside local project bin/ or configured path."""
+        """Find adb.exe inside bundled bin/, local project bin/ or configured path."""
+        resolved = resolve_binary("adb", self.scrcpy_dir)
+        if resolved:
+            return resolved
         base_bin = Path(__file__).resolve().parent.parent / "bin" / "adb.exe"
         candidates = [
             base_bin,

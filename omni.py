@@ -201,6 +201,17 @@ def show_hotkeys_guide():
 \033[1;36m==============================================================================\033[0m
 """)
 
+def launch_gui_app(cfg: dict):
+    """Launch the CustomTkinter Modern Windows 11 GUI Dashboard."""
+    try:
+        from gui.dashboard import OmniCaptureApp
+        app = OmniCaptureApp(cfg)
+        app.mainloop()
+    except Exception as e:
+        print(f"\n\033[1;31m[!] Error launching GUI dashboard: {e}\033[0m")
+        print("\033[90mEnsure customtkinter, pillow, and pystray are installed:\033[0m")
+        print("  pip install -r requirements.txt\n")
+
 def interactive_menu(
     cfg: dict,
     adb: ADBManager,
@@ -218,6 +229,7 @@ def interactive_menu(
 
         print("""
 \033[1;37mMAIN MENU OPTIONS:\033[0m
+  \033[1;35m[G]\033[0m 🖥️   \033[1mLaunch Modern Windows 11 GUI Dashboard\033[0m (Dark mode, system tray & live metrics)
   \033[1;36m[1]\033[0m 📱  \033[1mDisplay Mirror & PC Touch Controller\033[0m (Interactive control, mouse & keyboard)
   \033[1;36m[2]\033[0m 📷  \033[1mStealth Back Camera Stream\033[0m           (\033[92mNO camera app opened\033[0m, raw sensor stream)
   \033[1;36m[3]\033[0m 🤳  \033[1mStealth Front Camera Stream\033[0m          (\033[92mNO camera app opened\033[0m, selfie stream)
@@ -231,7 +243,11 @@ def interactive_menu(
   \033[1;36m[11]\033[0m 🔍 \033[1mDiagnostics & Hardware Inspection\033[0m    (Camera IDs, resolutions, battery, ADB check)
   \033[1;31m[0]\033[0m 🚪  \033[1mExit\033[0m
 """)
-        choice = input("\033[1;33mSelect an option [0-11]: \033[0m").strip()
+        choice = input("\033[1;33mSelect an option [0-11, G]: \033[0m").strip().lower()
+
+        if choice in ("g", "gui"):
+            launch_gui_app(cfg)
+            continue
 
         if choice == "1":
             target = check_device_ready_interactive(adb, dev_id)
@@ -520,7 +536,11 @@ def show_diagnostics(adb: ADBManager, scrcpy: ScrcpyEngine, dev_id: Optional[str
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OmniCapture - Display, Stealth Camera & Dual PC Recording Suite")
+    parser.add_argument("--gui", action="store_true", help="Launch the modern Windows 11 GUI dashboard")
     subparsers = parser.add_subparsers(dest="command")
+
+    # Command: gui
+    subparsers.add_parser("gui", help="Launch the modern Windows 11 GUI dashboard")
 
     # Command: mirror
     p_mirror = subparsers.add_parser("mirror", help="Mirror phone display with interactive PC control")
@@ -587,6 +607,11 @@ def main():
 
     parser = build_parser()
     args = parser.parse_args()
+
+    # If --gui flag or gui subcommand, launch GUI dashboard
+    if getattr(args, "gui", False) or args.command == "gui":
+        launch_gui_app(cfg)
+        return
 
     # If no command, run interactive menu
     if not args.command:

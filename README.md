@@ -52,36 +52,48 @@ Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge 
 
 ## Key Features
 
-### 1. Ultra Low-Latency Screen Mirroring (60 FPS)
+### 1. Modern Windows 11 Dark Mode Desktop Dashboard (GUI)
+- **Fluent Dark Aesthetics**: Built with `customtkinter` featuring dynamic telemetry cards, live device connectivity badges, and instant 1-click capture.
+- **Creator Hero Mode (Dual Simultaneous Recording)**: 1-click synchronized PC screen and mobile camera recording with live elapsed timer, real-time file size monitors, and instant stop/finalize.
+- **System Tray Integration**: Minimize to Windows System Tray on close to keep OmniCapture ready in the background with zero desktop clutter.
+- **Global Windows Hotkeys**: Trigger actions from anywhere in Windows even when OmniCapture is minimized:
+  - `Ctrl + Alt + D`: Quick Dual Simultaneous Recording start / stop.
+  - `Ctrl + Alt + M`: Quick Display Mirror & PC Touch Controller.
+  - `Ctrl + Alt + C`: Quick Stealth Camera Viewfinder.
+  - `Ctrl + Alt + R`: Open Recordings Folder in Windows Explorer.
+- **Recordings Gallery**: Integrated media manager with 1-click video playback in your default media player, folder explorer, and Google Drive upload.
+- **Zero-Install Standalone `.exe`**: Portable distribution available in `dist/OmniCapture/OmniCapture.exe` bundling the Python runtime, dependencies, and binaries.
+
+### 2. Ultra Low-Latency Screen Mirroring (60 FPS)
 - **H.264 / H.265 Hardware Pipeline**: Streams your Android display to your Windows PC with glass-to-glass latency under 25ms.
 - **Adaptive Resolution Profiling**: Defaulted to `1200` max dimension and `8 Mbps` bitrate to prevent MediaCodec buffer exhaustion on mid-range and budget SoCs (e.g., Qualcomm Snapdragon 662/680).
 - **Full PC Keyboard & Mouse Passthrough**: Type using your physical keyboard, drag and drop files, and synchronize your PC clipboard bidirectionally.
 
-### 2. Stealth Background Camera Streaming
+### 3. Stealth Background Camera Streaming
 - **Zero Mobile UI**: Access the phone's camera sensors directly via Android's low-level Camera2 API without launching the phone's Camera application.
 - **Screen-Off Operation**: Automatically puts the phone screen to sleep using stealth keyevent signals (`KEYCODE_SLEEP`), slashing battery consumption and heat generation by over 60%.
 - **Multi-Sensor Selection**: Easily switch between Wide Back (`--camera-id=0`), Ultra-Wide, Front Selfie (`--camera-id=1`), or Macro lenses.
 
-### 3. Unlimited Direct-to-PC Recording
+### 4. Unlimited Direct-to-PC Recording
 - **Bypass Mobile Storage**: Streams are demuxed and written in real time directly to your PC's NVMe or SSD storage (`recordings/`).
 - **Standard Video Containers**: Save files as standard `.mp4` or robust `.mkv` files with custom frame rates (30/60 FPS).
 - **Headless Recording**: Support for `--no-playback` background capture without opening an active preview window on your desktop.
 
-### 4. Dual Simultaneous Recording (PC Screen + Mobile Camera -> 2 Separate Files)
+### 5. Dual Simultaneous Recording (PC Screen + Mobile Camera -> 2 Separate Files)
 - **Concurrent Dual Capture**: Records your full Windows desktop display and mobile camera feed at the exact same time into **two separate, dedicated video files** (`REC_PC_SCREEN_*.mp4` and `REC_MOBILE_CAMERA_*.mp4`).
 - **Creator & Gaming Ready**: Ideal for video tutorials, streaming, and content creation where having isolated tracks allows flexible editing, repositioning, and reframing without fixed PiP overlay destruction.
-- **Synchronized Session Control**: Press `Enter` or `Ctrl+C` in the terminal to cleanly finalize and stop both streams simultaneously.
+- **Synchronized Session Control**: Press `Enter` or `Ctrl+C` in the terminal (or click Stop in GUI) to cleanly finalize and stop both streams simultaneously.
 - **Stealth Mobile Display**: Phone display remains turned off during recording to conserve battery and eliminate heat.
 
-### 5. Linux Kernel UHID Input Mode (Xiaomi / POCO Fix)
+### 6. Linux Kernel UHID Input Mode (Xiaomi / POCO Fix)
 - **Bypass OEM Security Locks**: Xiaomi MIUI and HyperOS devices block standard ADB touch injection (`java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission`).
 - **Hardware Simulation**: The `--uhid` flag registers a virtual USB HID mouse and keyboard directly at the Linux kernel level (`/dev/uhid`), providing immediate, stutter-free mouse control without enabling obscure developer account settings.
 
-### 6. Hybrid Google Drive Cloud Synchronization
+### 7. Hybrid Google Drive Cloud Synchronization
 - **Option A (Zero Overhead)**: Automatically copies completed recordings to your local Google Drive for Desktop virtual drive (`G:\My Drive\OmniCapture`).
 - **Option B (REST API v3)**: Standalone OAuth 2.0 chunked resumable upload engine that uploads large video files in the background without needing Google Drive desktop software installed.
 
-### 7. One-Click Wireless Mode (Wi-Fi ADB)
+### 8. One-Click Wireless Mode (Wi-Fi ADB)
 - Automatically queries your device's active local IP address via `ip route`, initializes port `5555` TCP/IP listening, and switches to wireless streaming so you can unplug your USB cable.
 
 ---
@@ -132,22 +144,70 @@ Open PowerShell and run:
 git clone https://github.com/rajvisual/OmniCapture.git
 cd OmniCapture
 
-# (Optional) Create virtual environment for cloud features
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# (Optional) Install dependencies for GUI and cloud features
 pip install -r requirements.txt
 
-# Launch OmniCapture
+# Launch Windows 11 GUI Dashboard
+.\omni-gui.bat
+# Or launch interactive terminal menu:
 .\omni.bat
 ```
 
 ---
 
-## Command-Line Usage
+## Global System Shortcuts & Hotkeys
 
-OmniCapture can be run interactively or via scriptable command-line arguments:
+OmniCapture supports system-wide global shortcuts that work even when the app is minimized to the Windows System Tray:
+
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `Ctrl + Alt + D` | **Quick Dual Recording** | Start or stop concurrent PC screen + mobile camera recording |
+| `Ctrl + Alt + M` | **Display Mirror** | Instantly launch 60 FPS display mirror & controller |
+| `Ctrl + Alt + C` | **Stealth Camera** | Launch background camera viewfinder with screen off |
+| `Ctrl + Alt + R` | **Recordings Folder** | Open the `recordings/` folder in Windows File Explorer |
+
+While a streaming or mirror window is focused, **Left Alt (`lalt`)** controls the live feed:
+
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| `Left Alt + F` | **Fullscreen** | Toggle fullscreen mirror display |
+| `Left Alt + P` | **Screen Power** | Toggle physical phone screen on / off |
+| `Left Alt + O` | **Mirror Screen Off** | Keep mirror stream alive while turning mobile display off |
+| `Left Alt + R` | **Pause / Resume** | Pause or resume active recording stream |
+| `Left Alt + H` | **Home Button** | Simulate Android Home navigation |
+| `Left Alt + B` | **Back Button** | Simulate Android Back navigation |
+| `Left Alt + S` | **App Switcher** | Open Android recent apps overview |
+| `Left Alt + N` | **Notification Shade** | Pull down Android notification panel |
+| `Left Alt + Up / Down` | **Volume Control** | Adjust device media volume up or down |
+| `Left Alt + C` | **Copy Clipboard** | Pull mobile device clipboard to PC |
+| `Left Alt + V` | **Paste Clipboard** | Push PC clipboard text to mobile device |
+
+---
+
+## Standalone Zero-Install Portable Executable
+
+OmniCapture can be built into a standalone, portable Windows application (`dist/OmniCapture/OmniCapture.exe`) requiring zero Python installation on target machines:
 
 ```powershell
+python scripts/build_standalone.py
+```
+
+The resulting distribution folder in `dist/OmniCapture/` is 100% self-contained and can be copied to any USB drive or Windows PC.
+
+---
+
+## Command-Line Usage
+
+OmniCapture can be run via GUI, interactive terminal menu, or scriptable CLI arguments:
+
+```powershell
+# Launch Modern Windows 11 GUI Dashboard
+python omni.py gui
+# Or use the --gui flag
+python omni.py --gui
+
+# Launch Interactive Terminal Menu
+python omni.py
 # 1. Interactive Terminal Dashboard
 python omni.py
 

@@ -154,3 +154,44 @@ python omni.py dual-record --no-camera-playback --upload
 - Detects the local IP address assigned to your phone's Wi-Fi network interface (`wlan0`).
 - Automatically restarts ADB in TCP mode (`adb tcpip 5555`) and establishes a TCP connection (`adb connect <ip>:5555`).
 - Allows you to disconnect the USB cable and continue streaming or recording wirelessly.
+
+---
+
+## 🖥️ 9. Modern Windows 11 Dark Mode GUI Dashboard & System Tray
+
+### Overview
+OmniCapture features a desktop GUI built with `customtkinter` designed for Windows 11 Fluent dark aesthetics.
+
+### Key Capabilities
+- **Live Device Telemetry**: Auto-detects connected Android devices over USB and Wi-Fi, showing real-time battery level, charging status, model name, and IP address.
+- **Hero Card: Dual Simultaneous Recording**:
+  - Live elapsed recording timer (`⏱ HH:MM:SS`).
+  - Real-time disk counters monitoring both video files simultaneously.
+  - 1-click stop and file integrity verification.
+- **System Tray Integration**:
+  - Minimizes to the Windows notification tray on window close (`WM_DELETE_WINDOW`).
+  - Right-click tray menu provides quick shortcuts to launch recording, mirror, or view files without opening the full UI.
+  - Native toast notifications for recording events.
+- **Global Windows Hotkeys**:
+  - Powered by Win32 `RegisterHotKey` for zero-latency, zero-driver global shortcuts:
+    - `Ctrl + Alt + D`: Quick Dual Recording start / stop.
+    - `Ctrl + Alt + M`: Quick Display Mirror.
+    - `Ctrl + Alt + C`: Quick Stealth Camera Stream.
+    - `Ctrl + Alt + R`: Open Recordings Folder.
+- **Integrated Media Gallery**:
+  - Visual listing of all captured recordings sorted by recency.
+  - 1-click playback via system default media player (`os.startfile`).
+  - Direct Google Drive cloud upload trigger per video file.
+
+---
+
+## 📦 10. Standalone Zero-Install Portable Bundle
+
+### Overview
+OmniCapture provides an automated PyInstaller build pipeline (`scripts/build_standalone.py`) that compiles the entire suite into a portable distribution (`dist/OmniCapture/OmniCapture.exe`).
+
+### Architecture
+- **Self-Contained Runtime**: Bundles Python 3.12, CustomTkinter, Pillow, Pystray, SDL2, and FFmpeg/scrcpy binaries into a single directory.
+- **Dynamic Resource Path Resolver (`core/resource_path.py`)**: Automatically detects whether code is executing from source or unpacked via `sys._MEIPASS`, ensuring binary lookups (`bin/adb.exe`, `bin/scrcpy.exe`) and recordings folder paths never break across environments.
+- **Zero Host Footprint**: Does not modify Windows registry or require admin rights to run. Can be executed directly from a USB flash drive or any folder.
+

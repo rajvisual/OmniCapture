@@ -70,5 +70,13 @@ class TestCLI(unittest.TestCase):
         args = self.parser.parse_args(["wireless"])
         self.assertEqual(args.command, "wireless")
 
+    def test_gui_command(self):
+        args = self.parser.parse_args(["gui"])
+        self.assertEqual(args.command, "gui")
+
+    def test_gui_flag(self):
+        args = self.parser.parse_args(["--gui"])
+        self.assertTrue(args.gui)
+
 if __name__ == "__main__":
     unittest.main()

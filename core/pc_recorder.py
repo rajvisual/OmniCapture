@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
+from core.resource_path import resolve_binary, get_recordings_dir
+
 class PCRecorder:
     """
     High-performance Windows desktop screen recorder powered by FFmpeg.
@@ -15,12 +17,16 @@ class PCRecorder:
     def __init__(self, ffmpeg_path: Optional[str] = None, bin_dir: Optional[str] = None):
         self.bin_dir = Path(bin_dir) if bin_dir else Path(__file__).resolve().parent.parent / "bin"
         self.ffmpeg_path = self._resolve_ffmpeg(ffmpeg_path)
-        self.last_log_path = self.bin_dir.parent / "recordings" / ".pc_recorder_last.log"
+        self.last_log_path = get_recordings_dir() / ".pc_recorder_last.log"
 
     def _resolve_ffmpeg(self, custom_path: Optional[str] = None) -> Optional[Path]:
         """Locate ffmpeg binary in custom path, bin directory, or system PATH."""
         if custom_path and Path(custom_path).is_file():
             return Path(custom_path)
+
+        resolved = resolve_binary("ffmpeg", self.bin_dir)
+        if resolved:
+            return resolved
 
         # Check local bin/
         local_candidate = self.bin_dir / "ffmpeg.exe"

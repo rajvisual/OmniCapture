@@ -5,6 +5,39 @@ All notable changes to the **OmniCapture** project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-27
+
+### Added
+- **Modern Windows 11 Dark Mode GUI Dashboard (`gui/dashboard.py`)**:
+  - Full-featured, responsive desktop GUI powered by `customtkinter` with Windows 11 Fluent dark aesthetics.
+  - Live Header: Device connection pill (`● Connected: Model [USB/Wi-Fi]`), live battery indicator, quick refresh, and camera lock release.
+  - Hero Card for **Dual Simultaneous Recording**: 1-click synchronized PC screen and mobile camera capture with live elapsed timer, real-time file size counters, and instant stop/finalize.
+  - Dedicated tabs for Display Mirror & PC Touch Controller (UHID / touch mode), Stealth Camera Stream Viewfinder, Direct-to-PC Recording, Wireless ADB Switch, Hardware Camera Diagnostics, Recordings Gallery, and Google Drive Cloud Settings.
+  - Recordings Gallery: Visual browser of past recordings with 1-click playback in Windows default player, folder open, and cloud upload.
+- **System Tray Integration (`gui/tray.py`)**:
+  - Background system tray icon using `pystray` and brand icons.
+  - Minimize to system tray on window close, keeping OmniCapture running smoothly in the background.
+  - System tray context menu: Quick Dashboard launch, Quick Dual Recording, Quick Mirror, Quick Camera Stream, Open Recordings Folder, and Exit.
+  - Native Windows tray notification toasts for recording status and device events.
+- **Global Windows Hotkeys (`gui/hotkeys.py`)**:
+  - Native Windows Win32 global hotkeys (`RegisterHotKey`) operating across the entire OS with zero CPU overhead:
+    - `Ctrl + Alt + D`: Quick Dual Simultaneous Recording start/stop.
+    - `Ctrl + Alt + M`: Quick Display Mirror & PC Controller.
+    - `Ctrl + Alt + C`: Quick Stealth Camera Stream.
+    - `Ctrl + Alt + R`: Open Recordings Folder in Windows Explorer.
+- **Standalone Portable `.exe` Bundle (Zero-Install)**:
+  - Added `OmniCapture.spec` and `scripts/build_standalone.py` to compile self-contained, portable Windows distribution.
+  - Bundles Python runtime, `customtkinter`, `pillow`, `pystray`, `scrcpy`, `adb`, and asset libraries into `dist/OmniCapture/`.
+- **Launchers & CLI Integration**:
+  - Added CLI command `python omni.py gui` and `--gui` flag.
+  - Added option `[G]` in interactive terminal dashboard menu to jump straight into the GUI.
+  - Added `omni-gui.bat` and `omni-gui.vbs` root launchers for seamless 1-click startup from Windows Explorer.
+- **Resource Path Resolver (`core/resource_path.py`)**:
+  - Centralized path resolution supporting both standard Python script execution and PyInstaller bundled execution (`sys._MEIPASS`).
+- **Automated Tests**:
+  - Added `tests/test_gui.py` covering theme colors, controller lifecycle, tray menu, hotkey registration, and resource path resolvers.
+  - Extended `tests/test_cli.py` to cover `gui` command and `--gui` flag.
+
 ## [1.1.0] - 2026-11-01
 
 ### Added
