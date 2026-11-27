@@ -537,7 +537,6 @@ class OmniTheme:
         """Initialize global appearance settings."""
         tokens = cls.get_tokens()
         ctk.set_appearance_mode("dark" if tokens.is_dark else "light")
-        ctk.set_default_color_theme("blue")
         cls._sync_class_tokens(tokens)
 
 

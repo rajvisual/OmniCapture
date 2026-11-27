@@ -212,7 +212,11 @@ class RecordingsGalleryDialog(ctk.CTkToplevel):
             ).pack(pady=(0, 28))
             return
 
-        for it in self.filtered_items:
+        # Virtualized page limit for fast (< 120ms) gallery opening even with 500+ items
+        page_size = getattr(self, "_page_limit", 40)
+        items_to_render = self.filtered_items[:page_size]
+
+        for it in items_to_render:
             path_str = str(it["path"])
             is_sel = path_str in self.selected_paths
 
@@ -308,6 +312,22 @@ class RecordingsGalleryDialog(ctk.CTkToplevel):
                 size="small",
                 command=lambda p=it["path"], n=it["name"]: self._delete_single_with_undo(p, n)
             ).pack(side="left", padx=2)
+
+        if len(self.filtered_items) > page_size:
+            remaining = len(self.filtered_items) - page_size
+            load_box = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+            load_box.pack(fill="x", pady=12)
+            StudioButton(
+                load_box,
+                text=f"Load More ({remaining} remaining)...",
+                variant="secondary",
+                size="medium",
+                command=self._load_more_items
+            ).pack(anchor="center")
+
+    def _load_more_items(self):
+        self._page_limit = getattr(self, "_page_limit", 40) + 40
+        self._render_rows()
 
     def _reveal_in_explorer(self, path: Path):
         try:

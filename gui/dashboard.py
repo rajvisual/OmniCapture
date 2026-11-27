@@ -19,7 +19,12 @@ from gui.tray import SystemTrayManager
 from gui.hotkeys import GlobalHotkeyManager
 from gui.single_instance import SingleInstanceManager
 from gui.taskbar import TaskbarManager
-from core.settings_manager import SettingsManager, clamp_window_geometry
+from core.settings_manager import (
+    SettingsManager,
+    clamp_window_geometry,
+    get_adaptive_default_geometry,
+    get_adaptive_minimum_geometry
+)
 from core.notifications import NotificationManager
 from gui.components.top_bar import UnifiedTopBar
 from gui.components.audio_meter import AudioChannelStrip
@@ -91,7 +96,8 @@ class OmniCaptureApp(ctk.CTk):
         # Appearance & Window Configuration
         tokens = OmniTheme.get_tokens()
         self.title("OmniCapture Studio")
-        self.minsize(1160, 760)
+        min_w, min_h = get_adaptive_minimum_geometry()
+        self.minsize(min_w, min_h)
         self._restore_window_geometry()
         self.configure(fg_color=tokens.bg_root)
 
@@ -191,9 +197,40 @@ class OmniCaptureApp(ctk.CTk):
             pass
         self._refresh_encoder_chip()
 
+        # Check for and recover any interrupted recordings left by an abnormal exit or crash
+        try:
+            recovered = self.controller.pc_recorder.check_and_recover_interrupted_recordings()
+            if recovered:
+                self.after(500, lambda: self.toasts.show(
+                    "Recording Recovered",
+                    f"Recovered {len(recovered)} interrupted recording take(s) from previous session.",
+                    level="success",
+                    action_text="Show in Explorer",
+                    action_cmd=self.controller.open_recordings_folder
+                ))
+        except Exception:
+            pass
+
     def _on_window_configure(self, event):
         if event.widget == self:
+            self._apply_density_mode(event.height < 800)
             self.frosted_glass.on_window_resized(event.width, event.height)
+
+    def _apply_density_mode(self, is_compact: bool):
+        """Toggle between compact density mode (< 800px height) and standard density mode."""
+        if hasattr(self, "_is_compact_density") and self._is_compact_density == is_compact:
+            return
+        self._is_compact_density = is_compact
+
+        # Dock height: 165 px for compact mode, 185 px for standard mode
+        dock_h = 165 if is_compact else 185
+        if hasattr(self, "dock_panel"):
+            self.dock_panel.configure(height=dock_h)
+
+        # Padding adjustments for compact density
+        if hasattr(self, "middle_container"):
+            pady = (4, 4) if is_compact else (OmniTheme.SPACE_8, OmniTheme.SPACE_6)
+            self.middle_container.pack_configure(pady=pady)
 
     def _init_taskbar_hwnd(self):
         try:
@@ -265,13 +302,18 @@ class OmniCaptureApp(ctk.CTk):
         )
 
     def _restore_window_geometry(self):
-        w = self.settings.get("window_width") or self.app_config.get("window_width", 1180)
-        h = self.settings.get("window_height") or self.app_config.get("window_height", 820)
-        x = self.settings.get("window_x") if self.settings.get("window_x") is not None else self.app_config.get("window_x")
-        y = self.settings.get("window_y") if self.settings.get("window_y") is not None else self.app_config.get("window_y")
+        min_w, min_h = get_adaptive_minimum_geometry()
+        self.minsize(min_w, min_h)
 
-        clamped_x, clamped_y, clamped_w, clamped_h = clamp_window_geometry(x, y, w, h, min_w=1160, min_h=760)
+        def_x, def_y, def_w, def_h = get_adaptive_default_geometry()
+        w = self.settings.get("window_width") or self.app_config.get("window_width", def_w)
+        h = self.settings.get("window_height") or self.app_config.get("window_height", def_h)
+        x = self.settings.get("window_x") if self.settings.get("window_x") is not None else self.app_config.get("window_x", def_x)
+        y = self.settings.get("window_y") if self.settings.get("window_y") is not None else self.app_config.get("window_y", def_y)
+
+        clamped_x, clamped_y, clamped_w, clamped_h = clamp_window_geometry(x, y, w, h, min_w=min_w, min_h=min_h)
         self.geometry(f"{clamped_w}x{clamped_h}+{clamped_x}+{clamped_y}")
+        self._apply_density_mode(clamped_h < 800)
 
         if self.settings.get("is_maximized"):
             self.after(100, lambda: self.state("zoomed"))
@@ -1177,9 +1219,16 @@ class OmniCaptureApp(ctk.CTk):
 
     def _start_audio_level_animation(self):
         self._meter_timer_active = True
+        self._meter_loop_running = False
+
+    def _trigger_audio_level_loop(self):
+        """Wake audio meter and pulse animations during active recording. Zero idle polling."""
+        if not self._meter_timer_active or getattr(self, "_meter_loop_running", False):
+            return
 
         def _loop():
             if not self._meter_timer_active:
+                self._meter_loop_running = False
                 return
             is_active = self.controller.is_dual_recording()
             try:
@@ -1198,10 +1247,18 @@ class OmniCaptureApp(ctk.CTk):
                 except Exception:
                     pass
 
-            delay = 80 if is_active else 250
-            self.after(delay, _loop)
+            if is_active:
+                self.after(80, _loop)
+            else:
+                self._meter_loop_running = False
+                try:
+                    self.strip_mic.simulate_audio_activity(active=False)
+                    self.strip_pc.simulate_audio_activity(active=False)
+                except Exception:
+                    pass
 
-        self.after(500, _loop)
+        self._meter_loop_running = True
+        self.after(50, _loop)
 
     # -------------------------------------------------------------------------
     # 7. COMMAND PALETTE & DIALOGS
@@ -1210,7 +1267,7 @@ class OmniCaptureApp(ctk.CTk):
     def _open_command_palette(self):
         commands = [
             {"title": "Start Dual Recording (PC + Phone)", "category": "Capture", "shortcut": "Ctrl+Alt+D", "action": self._on_start_dual_recording, "keywords": "rec video"},
-            {"title": "Stop Active Recording", "category": "Capture", "shortcut": "Esc", "action": self._on_stop_dual_recording, "keywords": "end finish"},
+            {"title": "Stop Active Recording", "category": "Capture", "shortcut": "", "action": self._on_stop_dual_recording, "keywords": "end finish"},
             {"title": "Launch Screen Mirror", "category": "Capture", "shortcut": "Ctrl+Alt+M", "action": self._on_launch_mirror, "keywords": "phone display view"},
             {"title": "Start Camera Viewfinder", "category": "Capture", "shortcut": "Ctrl+Alt+C", "action": self._on_start_camera_recording, "keywords": "webcam sensor"},
             {"title": "Start Screen Recording", "category": "Capture", "shortcut": "", "action": self._on_start_screen_recording, "keywords": "mobile display"},
@@ -1345,12 +1402,12 @@ class OmniCaptureApp(ctk.CTk):
             ("Ctrl + Alt + R", "Open Recordings Folder (Global Hotkey)"),
             ("Ctrl + Shift + L", "Release Camera Sensor Hardware Lock"),
             ("F5", "Refresh Connected Android Devices"),
-            ("1 / 2 / 3 / 4", "Switch Active Studio Scene"),
+            ("1 / 2 / 3 / 4", "Switch Active Studio Scene (when unfocused on text)"),
             ("Ctrl + ,", "Open Studio Preferences Dialog"),
-            ("Esc", "Stop Active Capture / Close Popups"),
+            ("Esc", "Dismiss Menu / Palette / Dialog (Never stops recording)"),
             ("Alt + F / C / T / V / S / H", "Windows Standard Menu Mnemonics"),
             ("Ctrl + W", "Minimize Application to System Tray"),
-            ("Ctrl + Q", "Exit Application Cleanly"),
+            ("Ctrl + Q", "Exit Application (confirms if recording active)"),
         ]
 
         for key, desc in shortcuts:
@@ -1392,11 +1449,14 @@ class OmniCaptureApp(ctk.CTk):
         self.bind("<F5>", lambda e: self._on_manual_refresh())
         self.bind("<Control-comma>", lambda e: self._open_settings_window())
         self.bind("<Control-q>", lambda e: self._on_app_exit())
+        self.bind("<Control-Q>", lambda e: self._on_app_exit())
         self.bind("<Control-w>", lambda e: self._on_minimize_to_tray())
         self.bind("<Control-slash>", lambda e: self._open_hotkeys_guide())
         self.bind("<Control-question>", lambda e: self._open_hotkeys_guide())
         self.bind("<Control-Shift-L>", lambda e: self._on_release_lock())
         self.bind("<Control-Shift-l>", lambda e: self._on_release_lock())
+        self.bind("<Control-Alt-r>", lambda e: self.controller.open_recordings_folder())
+        self.bind("<Control-Alt-R>", lambda e: self.controller.open_recordings_folder())
         self.bind("<Escape>", lambda e: self._on_escape_pressed())
 
         # Alt-Key Menu Mnemonics (Windows 11 Standard)
@@ -1413,7 +1473,7 @@ class OmniCaptureApp(ctk.CTk):
         self.bind("4", lambda e: self._select_scene("screen") if not self._is_entry_focused() else None)
 
     def _on_escape_pressed(self):
-        """Handle Escape key: close active palette/dropdown, or stop recording if active."""
+        """Handle Escape key: close active palette, dropdown, or dialog only. Never stops recording."""
         if hasattr(self, "palette") and self.palette:
             self.palette.close()
             return
@@ -1424,8 +1484,6 @@ class OmniCaptureApp(ctk.CTk):
                 pass
             self.top_bar.active_dropdown = None
             return
-        if self.controller.is_dual_recording():
-            self._on_stop_dual_recording()
 
     def _is_entry_focused(self) -> bool:
         try:
@@ -1472,6 +1530,9 @@ class OmniCaptureApp(ctk.CTk):
         tokens = OmniTheme.get_tokens()
         if ok:
             self._recording_pulse_active = True
+            self._trigger_audio_level_loop()
+            if hasattr(self, "frosted_glass") and self.frosted_glass:
+                self.frosted_glass.set_recording_state(True)
             self.master_record_btn.configure(
                 text="Stop Recording",
                 fg_color=tokens.status_recording,
@@ -1531,6 +1592,8 @@ class OmniCaptureApp(ctk.CTk):
             self.foot_disk_lbl.configure(text=self._query_disk_space_str())
             if hasattr(self, "state_banner") and self.state_banner:
                 self.state_banner.set_state("connected_usb" if self._connected_device_id else "no_device")
+            if hasattr(self, "frosted_glass") and self.frosted_glass:
+                self.frosted_glass.set_recording_state(False)
             self.taskbar.set_recording_overlay(False)
             self.taskbar.set_progress_state(TaskbarManager.TBPF_NOPROGRESS)
             self.tray.set_recording_state(False)

@@ -5,12 +5,14 @@ import shutil
 import json
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
+from core.settings_manager import get_appdata_dir
 
 class DriveUploader:
-    def __init__(self, config_dict: Dict[str, Any]):
-        self.config = config_dict
+    def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
+        self.config = config_dict or {}
         self.drive_cfg = self.config.get("google_drive", {})
         self.desktop_sync_path = self._detect_desktop_drive()
+        self.token_path = get_appdata_dir() / "drive_token.json"
 
     def _detect_desktop_drive(self) -> Optional[Path]:
         """Detect Google Drive for Desktop virtual drive or sync folder across all drive letters."""
@@ -121,13 +123,12 @@ class DriveUploader:
 
         SCOPES = ["https://www.googleapis.com/auth/drive.file"]
         creds = None
-        token_path = Path(self.drive_cfg.get("token_file", "drive_token.json"))
+        from core.settings_manager import get_appdata_dir
+        # Security: OAuth tokens are strictly stored in %APPDATA%/OmniCapture/, never in the repo or build
+        token_path = get_appdata_dir() / "drive_token.json"
         client_secrets_path = Path(self.drive_cfg.get("credentials_file", "client_secrets.json"))
 
-        # Look in omnicapture root
         base_dir = Path(__file__).resolve().parent.parent
-        if not token_path.is_absolute():
-            token_path = base_dir / token_path
         if not client_secrets_path.is_absolute():
             client_secrets_path = base_dir / client_secrets_path
 

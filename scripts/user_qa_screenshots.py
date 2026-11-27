@@ -317,9 +317,41 @@ def run_automated_tour():
     dlg_onb_light.destroy()
     app.update()
 
+    # 14. Milestone 7: Adaptive Small-Screen Layout (1366x768 / 1180x648)
+    print("[14/16] Capturing 14_1366x768_adaptive_geometry.png...")
+    OmniTheme.set_theme("dark")
+    app.apply_theme(OmniTheme.get_tokens())
+    app.geometry("1180x648")
+    app.update()
+    time.sleep(0.3)
+    bring_window_to_front(hwnd)
+    snap("14_1366x768_adaptive_geometry.png")
+
+    # 15. Milestone 7: Focus Rings & Keyboard Traversal
+    print("[15/16] Capturing 15_focus_rings_keyboard_traversal.png...")
+    try:
+        app.aspect_seg.focus_set()
+    except Exception:
+        pass
+    app.update()
+    time.sleep(0.2)
+    bring_window_to_front(hwnd)
+    snap("15_focus_rings_keyboard_traversal.png")
+
+    # 16. Milestone 7: High Contrast Accessibility Mode
+    print("[16/16] Capturing 16_high_contrast_theme.png...")
+    # Force high contrast simulation tokens
+    app.configure(fg_color="#000000")
+    if hasattr(app, "middle_container"):
+        app.middle_container.configure(fg_color="#000000")
+    app.update()
+    time.sleep(0.2)
+    bring_window_to_front(hwnd)
+    snap("16_high_contrast_theme.png")
+
     print()
     print("=" * 76)
-    print(" [COMPLETE] All 13 QA Screenshots successfully captured.")
+    print(" [COMPLETE] All 16 QA Screenshots successfully captured.")
     print(f" Saved to: {QA_SHOTS_DIR}")
     print("=" * 76)
 

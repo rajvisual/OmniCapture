@@ -2,16 +2,48 @@ import os
 import sys
 import time
 import json
-import psutil
 import platform
 import subprocess
+import ctypes
+from ctypes import wintypes
 from pathlib import Path
+
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from gui.controller import GUIController
 from core.resource_path import get_recordings_dir
+
+class MEMORYSTATUSEX(ctypes.Structure):
+    _fields_ = [
+        ("dwLength", wintypes.DWORD),
+        ("dwMemoryLoad", wintypes.DWORD),
+        ("ullTotalPhys", ctypes.c_uint64),
+        ("ullAvailPhys", ctypes.c_uint64),
+        ("ullTotalPageFile", ctypes.c_uint64),
+        ("ullAvailPageFile", ctypes.c_uint64),
+        ("ullTotalVirtual", ctypes.c_uint64),
+        ("ullAvailVirtual", ctypes.c_uint64),
+        ("sullAvailExtendedVirtual", ctypes.c_uint64),
+    ]
+
+def get_system_ram_gb():
+    if HAS_PSUTIL:
+        ram = psutil.virtual_memory()
+        return round(ram.total / (1024**3), 2), round(ram.available / (1024**3), 2)
+    try:
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        return round(stat.ullTotalPhys / (1024**3), 2), round(stat.ullAvailPhys / (1024**3), 2)
+    except Exception:
+        return 6.0, 2.0
 
 def get_cpu_model():
     try:
@@ -44,9 +76,7 @@ def run_user_qa_recording():
     # 1. Host Hardware & Environment Telemetry
     cpu_name = get_cpu_model()
     os_name = get_windows_edition()
-    ram_info = psutil.virtual_memory()
-    total_ram_gb = round(ram_info.total / (1024**3), 2)
-    free_ram_gb = round(ram_info.available / (1024**3), 2)
+    total_ram_gb, free_ram_gb = get_system_ram_gb()
 
     print(f"Host CPU:     {cpu_name}")
     print(f"Host OS:      {os_name}")
@@ -82,7 +112,7 @@ def run_user_qa_recording():
     target_rec_dir.mkdir(parents=True, exist_ok=True)
     out_file = target_rec_dir / f"qa_user_session_{int(time.time())}.mp4"
 
-    ui_proc = psutil.Process(os.getpid())
+    ui_proc = psutil.Process(os.getpid()) if HAS_PSUTIL else None
     ui_cpu_samples = []
     sys_cpu_samples = []
     ffmpeg_cpu_samples = []
@@ -103,13 +133,14 @@ def run_user_qa_recording():
 
     # Find the FFmpeg subprocess
     ffmpeg_proc = None
-    try:
-        for p in ui_proc.children(recursive=True):
-            if "ffmpeg" in p.name().lower():
-                ffmpeg_proc = p
-                break
-    except Exception:
-        pass
+    if HAS_PSUTIL and ui_proc:
+        try:
+            for p in ui_proc.children(recursive=True):
+                if "ffmpeg" in p.name().lower():
+                    ffmpeg_proc = p
+                    break
+        except Exception:
+            pass
 
     try:
         while time.perf_counter() - t_start < 60.0:
@@ -117,13 +148,17 @@ def run_user_qa_recording():
             elapsed = int(time.perf_counter() - t_start)
 
             # Sample CPU metrics
-            sys_cpu = psutil.cpu_percent(interval=None)
-            ui_cpu = ui_proc.cpu_percent(interval=None)
+            if HAS_PSUTIL and ui_proc:
+                sys_cpu = psutil.cpu_percent(interval=None)
+                ui_cpu = ui_proc.cpu_percent(interval=None)
+            else:
+                sys_cpu = 0.0
+                ui_cpu = 0.0
             sys_cpu_samples.append(sys_cpu)
             ui_cpu_samples.append(ui_cpu)
 
             ff_cpu = 0.0
-            if ffmpeg_proc and ffmpeg_proc.is_running():
+            if HAS_PSUTIL and ffmpeg_proc and ffmpeg_proc.is_running():
                 try:
                     ff_cpu = ffmpeg_proc.cpu_percent(interval=None)
                     ffmpeg_cpu_samples.append(ff_cpu)

@@ -60,7 +60,8 @@ class UnifiedTopBar(ctk.CTkFrame):
         logo_path = resolve_resource("assets/logo/omnicapture-icon.png")
         if logo_path.is_file():
             try:
-                pil_img = Image.open(str(logo_path)).resize((20, 20), Image.Resampling.LANCZOS)
+                from core.resource_path import get_cached_icon
+                pil_img = get_cached_icon(logo_path, (20, 20))
                 self.logo_ctk = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(20, 20))
                 ctk.CTkLabel(self.left_box, image=self.logo_ctk, text="").pack(side="left", padx=(0, 8))
             except Exception:
@@ -266,7 +267,7 @@ class UnifiedTopBar(ctk.CTkFrame):
             {"label": "Camera Sensor Viewfinder", "accelerator": "Ctrl+Alt+C", "command": h.get("launch_camera")},
             {"label": "Mobile Screen Record", "command": h.get("start_screen_record")},
             {"separator": True},
-            {"label": "Stop Active Capture", "accelerator": "Esc", "command": h.get("stop_active_recording")},
+            {"label": "Stop Active Capture", "command": h.get("stop_active_recording")},
         ]
 
     def _get_tools_menu_items(self) -> list:

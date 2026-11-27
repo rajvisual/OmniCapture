@@ -249,6 +249,12 @@ class StudioStateBanner(ctk.CTkFrame):
         )
         self.copy_btn.pack(side="right", padx=(0, 4))
 
+    def get_details(self) -> str:
+        """Return formatted diagnostic details string for clipboard / diagnostics."""
+        preset = self.STATE_PRESETS.get(self.current_state, {})
+        title = preset.get("title", self.current_state)
+        return f"OmniCapture Diagnostics [{self.current_state}] - {title}\n{self.current_details}"
+
     def set_state(self, state_name: str, custom_desc: Optional[str] = None, custom_details: Optional[str] = None):
         """Update banner content to reflect any state in the State Matrix."""
         self.current_state = state_name

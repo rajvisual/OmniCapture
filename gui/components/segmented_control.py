@@ -115,11 +115,11 @@ class StudioSegmentedControl(ctk.CTkSegmentedButton):
 
     def _on_focus_in(self, event=None):
         tokens = OmniTheme.get_tokens()
-        self.configure(border_width=2)
+        self.configure(border_width=2, border_color=tokens.border_focus)
 
     def _on_focus_out(self, event=None):
         tokens = OmniTheme.get_tokens()
-        self.configure(border_width=1)
+        self.configure(border_width=1, border_color=tokens.border_default)
 
     def apply_tokens(self, tokens: ThemeTokens):
         self._apply_tokens(tokens)
