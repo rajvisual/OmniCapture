@@ -51,7 +51,7 @@ OmniCapture is maintained in **two distinct public editions** to serve both grap
 
 | Dark Liquid Glass Theme (Default) | Light Minimal Theme (Solid Fluent Light) |
 | :---: | :---: |
-| ![Studio Dark](assets/screenshots/m1_dark_liquid_glass.png) | ![Studio Light](assets/screenshots/m1_light_minimal.png) |
+| ![Studio Dark](assets/screenshots/studio_dark_liquid_glass.png) | ![Studio Light](assets/screenshots/studio_light_minimal.png) |
 
 ---
 
@@ -89,12 +89,16 @@ Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge 
 
 <div align="center">
 
-### OmniCapture Studio v1.3.0 (Windows 11 Broadcast Workstation)
+### OmniCapture Studio v1.4.0 (Windows 11 Broadcast Workstation)
 | Dark Liquid Glass Theme (Mica & Specular Alpha) | Light Minimal Theme (Solid Fluent Light) |
 | :---: | :---: |
-| <img src="assets/screenshots/m1_dark_liquid_glass.png" width="480" alt="Dark Liquid Glass Studio" /> | <img src="assets/screenshots/m1_light_minimal.png" width="480" alt="Light Minimal Studio" /> |
+| <img src="assets/screenshots/studio_dark_liquid_glass.png" width="480" alt="Dark Liquid Glass Studio" /> | <img src="assets/screenshots/studio_light_minimal.png" width="480" alt="Light Minimal Studio" /> |
 
-### Interactive Terminal Dashboard & Diagnostics
+| Synchronized Active Recording HUD | Command Palette (Ctrl+P Fuzzy Search) |
+| :---: | :---: |
+| <img src="assets/screenshots/studio_recording_active.png" width="480" alt="Studio Recording Active" /> | <img src="assets/screenshots/studio_command_palette.png" width="480" alt="Studio Command Palette" /> |
+
+### Interactive Terminal Dashboard & Diagnostics (Classic Edition)
 | Terminal Interactive Dashboard | Camera2 API Hardware Diagnostics |
 | :---: | :---: |
 | <img src="assets/screenshots/01-terminal-dashboard.png" width="460" alt="Terminal Dashboard" /> | <img src="assets/screenshots/02-device-diagnostics.png" width="460" alt="Device Diagnostics" /> |
