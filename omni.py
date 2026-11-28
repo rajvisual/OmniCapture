@@ -604,8 +604,12 @@ def main():
         launch_gui_app(cfg)
         return
 
-    # If no command, run interactive menu
+    # If no command, check if running in a windowed/GUI environment or interactive terminal
     if not args.command:
+        if not sys.stdin or not hasattr(sys.stdin, "isatty") or not sys.stdin.isatty():
+            # Windowed mode without console (e.g. PyInstaller GUI exe or pythonw) -> Launch GUI directly
+            launch_gui_app(cfg)
+            return
         interactive_menu(cfg, adb, scrcpy, recorder, uploader)
         return
 
