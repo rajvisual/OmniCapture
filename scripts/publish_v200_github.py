@@ -11,6 +11,7 @@ DIST_DIR = REPO_ROOT / "dist"
 REPO_NAME = "rajvisual/OmniCapture"
 
 STUDIO_ZIP = DIST_DIR / "OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip"
+SETUP_EXE = DIST_DIR / "OmniCapture-Studio-v2.0.0-Setup.exe"
 CHECKSUMS = DIST_DIR / "SHA256SUMS.txt"
 
 
@@ -41,7 +42,10 @@ def github_req(endpoint: str, method: str = "GET", data: dict = None, token: str
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=encoded, headers=headers, method=method)
     with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        body = resp.read()
+        if not body:
+            return {}
+        return json.loads(body.decode("utf-8"))
 
 
 def upload_asset(release_id: int, file_path: Path, token: str, content_type: str = "application/octet-stream"):
@@ -88,15 +92,17 @@ def main():
         "  - 21-state Studio State Banner matrix with plain-language cause summaries and 1-click remedies.\n"
         "  - Full keyboard accessibility engine with tab focus rings and safe dismiss (`Escape` never stops recording).\n\n"
         "---\n\n"
-        "### 📦 Download & Run (Zero-Install Standalone Portable):\n"
-        "1. Download **`OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip`** from Assets below.\n"
-        "2. Extract anywhere on your PC.\n"
-        "3. Double-click **`OmniCapture.exe`** to launch immediately!\n\n"
+        "### 📦 Download Options:\n"
+        "- **Recommended for Windows 11**: **[OmniCapture-Studio-v2.0.0-Setup.exe](https://github.com/rajvisual/OmniCapture/releases/download/v2.0.0/OmniCapture-Studio-v2.0.0-Setup.exe)** (27.4 MB)\n"
+        "  1-click native Windows installer. Automatically creates Desktop and Start Menu shortcuts. Zero UAC prompts required.\n"
+        "- **Zero-Install Standalone Portable**: **[OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip](https://github.com/rajvisual/OmniCapture/releases/download/v2.0.0/OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip)** (46.9 MB)\n"
+        "  Extract anywhere on your PC and double-click `OmniCapture.exe` to launch immediately!\n\n"
         "> [!NOTE]\n"
         "> **FFmpeg Requirement**: PC screen recording requires FFmpeg. Install via `winget install Gyan.FFmpeg` "
         "or drop `ffmpeg.exe` into the app's `bin/` directory.\n\n"
         "### 🔐 Verification Checksums (SHA-256):\n"
         "```text\n"
+        "39047e17c104387404422afe0f0eab43d6072bcdc757b1a7c5da0aee66d6dde6  OmniCapture-Studio-v2.0.0-Setup.exe\n"
         "7ded9025dbaa21de1616d88459b1a2e2d49501c6bcd749456dc284e39f719d31  OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip\n"
         "17246d92222385590f5586c776d1d8f3d3ace32fb4ab600f95283f37b40491ce  OmniCapture-Classic-v1.1.0-Windows-x64.zip\n"
         "```\n\n"
@@ -130,15 +136,23 @@ def main():
         github_req(f"releases/{rel_id}", method="PATCH", data=payload, token=token)
 
     # Upload assets
-    if STUDIO_ZIP.exists():
-        print(f"[*] Uploading {STUDIO_ZIP.name} ({STUDIO_ZIP.stat().st_size / (1024*1024):.2f} MB)...")
-        upload_asset(rel_id, STUDIO_ZIP, token, "application/zip")
-        print("[✓] Studio zip uploaded.")
+    rel_data = github_req(f"releases/{rel_id}", token=token)
+    existing_assets = {a["name"]: a["id"] for a in rel_data.get("assets", [])}
 
-    if CHECKSUMS.exists():
-        print(f"[*] Uploading {CHECKSUMS.name}...")
-        upload_asset(rel_id, CHECKSUMS, token, "text/plain")
-        print("[✓] Checksums uploaded.")
+    def safe_upload(file_path: Path, content_type: str):
+        if not file_path.exists():
+            return
+        if file_path.name in existing_assets:
+            asset_id = existing_assets[file_path.name]
+            print(f"[*] Deleting existing asset {file_path.name} (ID: {asset_id})...")
+            github_req(f"releases/assets/{asset_id}", method="DELETE", token=token)
+        print(f"[*] Uploading {file_path.name} ({file_path.stat().st_size / (1024*1024):.2f} MB)...")
+        upload_asset(rel_id, file_path, token, content_type)
+        print(f"[✓] {file_path.name} uploaded successfully.")
+
+    safe_upload(SETUP_EXE, "application/octet-stream")
+    safe_upload(STUDIO_ZIP, "application/zip")
+    safe_upload(CHECKSUMS, "text/plain")
 
     print("\n" + "=" * 70)
     print("  ✅ OMNICAPTURE STUDIO v2.0.0 PUBLISHED SUCCESSFULLY!")
