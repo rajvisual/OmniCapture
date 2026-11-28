@@ -27,7 +27,7 @@ OmniCapture is maintained in **two distinct public editions** to serve both grap
 
 | Edition | Version | Interface | Best For | Requirements | Download & Run |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **OmniCapture Studio** | **v1.4.0** *(Pre-Release)* | **Modern Desktop GUI** | Content creators, educators, and streamers needing live multi-scene viewfinders, audio meters, crash survival, and 1-click recording. | Windows 11 / 10 64-bit<br>• Android phone (USB/Wi-Fi)<br>• FFmpeg installed | [📥 Download v1.4.0 Portable (.zip)](https://github.com/rajvisual/OmniCapture/releases/download/v1.4.0/OmniCapture-Studio-v1.4.0-Windows-x64-Portable.zip)<br>Run `OmniCapture.exe` |
+| **OmniCapture Studio** | **v2.0.0** | **Native Desktop Application** | Content creators, educators, and streamers needing live multi-scene viewfinders, audio meters, crash survival, and 1-click recording with a 100% zero-terminal desktop experience. | Windows 11 / 10 64-bit<br>• Android phone (USB/Wi-Fi)<br>• FFmpeg installed | [📥 Download v2.0.0 Portable (.zip)](https://github.com/rajvisual/OmniCapture/releases/download/v2.0.0/OmniCapture-Studio-v2.0.0-Windows-x64-Portable.zip)<br>Double-click `OmniCapture.exe` |
 | **OmniCapture Classic** | **v1.1.0** *(Stable)* | **Terminal / CLI Only** | Developers, automation scripts, minimal headless rigs, and users who prefer a pure terminal menu with zero GUI overhead. | Windows 10 / 11<br>• Python 3.10+ or portable<br>• Android phone | [📥 View v1.1.0 Classic Release](https://github.com/rajvisual/OmniCapture/releases/tag/v1.1.0)<br>Run `python omni.py` |
 
 > [!NOTE]
@@ -89,7 +89,7 @@ Built on top of a bundled, zero-configuration `scrcpy` and Android Debug Bridge 
 
 <div align="center">
 
-### OmniCapture Studio v1.4.0 (Windows 11 Broadcast Workstation)
+### OmniCapture Studio v2.0.0 (Windows 11 Broadcast Workstation)
 | Dark Liquid Glass Theme (Mica & Specular Alpha) | Light Minimal Theme (Solid Fluent Light) |
 | :---: | :---: |
 | <img src="assets/screenshots/studio_dark_liquid_glass.png" width="480" alt="Dark Liquid Glass Studio" /> | <img src="assets/screenshots/studio_light_minimal.png" width="480" alt="Light Minimal Studio" /> |

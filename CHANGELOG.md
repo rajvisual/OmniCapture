@@ -5,6 +5,23 @@ All notable changes to the **OmniCapture** project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-28
+
+### Added
+- **True Zero-Terminal Windows Desktop Application**:
+  - Re-architected execution pipeline into a 100% standalone desktop application with zero terminal, zero console window, and zero command prompt flash.
+  - Dedicated entry point `studio.py` and windowed launcher `studio.pyw` running under `pythonw.exe`.
+  - Silent Windows launcher `OmniCapture Studio.vbs` for 1-click execution from source without console flashing.
+  - Smart windowed auto-detection in `omni.py`: double-clicking or launching in GUI mode immediately opens the Studio without awaiting stdin or displaying terminal menus.
+  - 1-click Desktop Shortcut generator `scripts/create_desktop_shortcut.ps1` with official high-resolution icon (`assets/logo/omnicapture.ico`).
+- **Official Release Split**:
+  - **OmniCapture Studio v2.0.0**: Native Windows 11 Fluent desktop broadcast workstation.
+  - **OmniCapture Classic v1.1.0**: Lightweight keyboard-driven terminal CLI.
+
+### Changed
+- Promoted application to major version **2.0.0** representing the full transition from terminal CLI to native desktop studio.
+- Updated all PE executable metadata (`FileVersion 2.0.0.0`, `ProductVersion 2.0.0.0`) and runtime titlebars.
+
 ## [1.4.0] - 2026-11-28
 
 ### Added
